@@ -1,0 +1,76 @@
+name: solitaire
+description: "Collection of card games"
+publish_to: 'none'
+version: 1.0.0+12
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  adaptive_action_sheet: ^2.0.3
+  audioplayers: ^6.4.0
+  card_game: ^2.0.0
+  collection:
+  confetti: ^0.8.0
+  equatable: ^2.0.7
+  flutter_hooks: ^0.21.2
+  flutter_markdown: ^0.7.7
+  flutter_svg: ^2.0.17
+  font_awesome_flutter: ^10.8.0
+  hooks_riverpod: ^2.6.1
+  intl: ^0.18.0
+  json_annotation: ^4.9.0
+  material_symbols_icons: ^4.2811.0
+  package_info_plus: ^8.3.0
+  provider: ^6.1.2
+  riverpod_annotation: ^2.6.1
+  shared_preferences: ^2.5.3
+  smooth_page_indicator: ^1.2.0+3
+  tutorial_coach_mark: ^1.3.0
+  url_launcher: ^6.3.1
+  vector_graphics: ^1.1.18
+
+  utils:
+    git:
+      url: https://github.com/JLogical-Apps/flood
+      ref: v4.3
+      path: packages/utils/utils
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  build_runner: ^2.4.15
+  custom_lint: ^0.7.5
+  flutter_launcher_icons: ^0.14.3
+  flutter_lints: ^5.0.0
+  json_serializable: ^6.8.0
+  riverpod_generator: ^2.6.5
+  riverpod_lint: ^2.6.5
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/
+    - assets/backs/
+    - assets/faces/
+    - assets/logos/
+    - assets/sounds/
+
+flutter_launcher_icons: # dart run flutter_launcher_icons
+  image_path: "assets/app_icon.png"
+
+  android: "launcher_icon"
+  adaptive_icon_foreground: "assets/cards_with_padding.png"
+  adaptive_icon_background: "#4CAF50"
+  min_sdk_android: 21
+
+  ios: true
+  remove_alpha_ios: true
+
+  web:
+    generate: true
+    image_path: "assets/cards.png"

@@ -78,18 +78,8 @@ class PyramidSolitaireState {
       final row = deck.take(r + 1).toList();
       deck = deck.skip(r + 1).toList();
       pyramid.add(row);
-      // All but top layer are revealed only when not covered
-      hidden.add(List<bool>.filled(r + 1, true));
-    }
-
-    // Reveal top-most card initially
-    hidden[6] = List<bool>.filled(7, false);
-    // Reveal cards that are not covered (a card is covered if two cards below at row+1 col and col+1 exist)
-    for (var r = 5; r >= 0; r--) {
-      for (var c = 0; c <= r; c++) {
-        final covered = _hasCard(pyramid, r + 1, c) && _hasCard(pyramid, r + 1, c + 1);
-        hidden[r][c] = covered;
-      }
+      // All cards start face-up in pyramid solitaire
+      hidden.add(List<bool>.filled(r + 1, false));
     }
 
     // Remaining deck -> stock; waste initially empty
@@ -346,56 +336,99 @@ class PyramidSolitaire extends HookConsumerWidget {
             spacing: spacing,
             children: List.generate(state.value.pyramid.length, (r) {
               final rowCards = state.value.pyramid[r];
+              
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                spacing: spacing,
+                children: List.generate(rowCards.length, (c) {
+                  final isSelected = state.value.selected?.row == r && state.value.selected?.col == c;
+                  
+                  return Container(
+                    decoration: isSelected ? BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.yellow.withOpacity(0.8),
+                          blurRadius: 20,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ) : null,
+                    child: SizedBox(
+                      width: cardWidth,
+                      height: 93 * sizeMultiplier,
+                    ),
+                  );
+                }),
+              );
+            }),
+          );
+        }
+        
+        Widget buildPyramidCards() {
+          final cardWidth = 69 * sizeMultiplier;
+          final cardHeight = 93 * sizeMultiplier;
+          
+          return Stack(
+            children: List.generate(state.value.pyramid.length, (r) {
+              final rowCards = state.value.pyramid[r];
               final rowHidden = state.value.hidden[r];
-              return CardLinearGroup<PyramidCard, dynamic>(
-                // Stable group per row avoids moving cards between groups when a pair is removed
-                value: 'pyr-row-$r',
-                values: rowCards,
-                maxGrabStackSize: 0,
-                // Lay out cards horizontally in the row with spacing
-                cardOffset: Offset(cardWidth + spacing, 0),
-                canCardBeGrabbed: (index, __) => !rowHidden[index],
-                isCardFlipped: (index, __) => rowHidden[index],
-                onCardPressed: (pressedCard) {
-                  final c = rowCards.indexOf(pressedCard);
-                  if (c == -1) return;
-                  if (rowHidden[c]) return;
-                  // Remove King alone
-                  if (state.value.canRemoveKing(pressedCard)) {
-                    ref.read(audioServiceProvider).playPlace();
-                    state.value = state.value.withRemoveAt(r, c);
-                    return;
-                  }
-                  // Try pair with waste
-                  if (state.value.waste.isNotEmpty &&
-                      state.value.canRemovePair(pressedCard, state.value.waste.last)) {
-                    ref.read(audioServiceProvider).playPlace();
-                    state.value = state.value.withRemoveWithWaste(PyramidCardPos(r, c));
-                    return;
-                  }
-                  // Pair with another exposed pyramid card via selection
-                  final selected = state.value.selected;
-                  if (selected == null) {
-                    state.value = state.value.copyWith(selected: PyramidCardPos(r, c));
-                    return;
-                  }
-                  if (selected.row == r && selected.col == c) {
-                    state.value = state.value.copyWith(clearSelected: true);
-                    return;
-                  }
-                  final other = state.value.pyramid[selected.row][selected.col];
-                  if (state.value.canRemovePair(pressedCard, other)) {
-                    ref.read(audioServiceProvider).playPlace();
-                    state.value = state.value.withRemovePairFromPyramid(
-                      PyramidCardPos(r, c),
-                      PyramidCardPos(selected.row, selected.col),
-                    );
-                    return;
-                  }
-                  // Update selection to the newly tapped card
-                  state.value = state.value.copyWith(selected: PyramidCardPos(r, c));
-                },
-                canMoveCardHere: (_) => false,
+              final rowWidth = (cardWidth * rowCards.length) + (spacing * (rowCards.length - 1));
+              
+              return Positioned(
+                top: r * (cardHeight + spacing),
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: SizedBox(
+                    width: rowWidth,
+                    height: cardHeight,
+                    child: CardLinearGroup<PyramidCard, dynamic>(
+                      value: 'pyr-row-$r',
+                      values: rowCards,
+                      maxGrabStackSize: 0,
+                      cardOffset: Offset(cardWidth + spacing, 0),
+                      canCardBeGrabbed: (index, __) => !rowHidden[index],
+                      isCardFlipped: (index, __) => rowHidden[index],
+                      onCardPressed: (pressedCard) {
+                        final c = rowCards.indexOf(pressedCard);
+                        if (c == -1) return;
+                        if (rowHidden[c]) return;
+                        if (state.value.canRemoveKing(pressedCard)) {
+                          ref.read(audioServiceProvider).playPlace();
+                          state.value = state.value.withRemoveAt(r, c);
+                          return;
+                        }
+                        if (state.value.waste.isNotEmpty &&
+                            state.value.canRemovePair(pressedCard, state.value.waste.last)) {
+                          ref.read(audioServiceProvider).playPlace();
+                          state.value = state.value.withRemoveWithWaste(PyramidCardPos(r, c));
+                          return;
+                        }
+                        final selected = state.value.selected;
+                        if (selected == null) {
+                          state.value = state.value.copyWith(selected: PyramidCardPos(r, c));
+                          return;
+                        }
+                        if (selected.row == r && selected.col == c) {
+                          state.value = state.value.copyWith(clearSelected: true);
+                          return;
+                        }
+                        final other = state.value.pyramid[selected.row][selected.col];
+                        if (state.value.canRemovePair(pressedCard, other)) {
+                          ref.read(audioServiceProvider).playPlace();
+                          state.value = state.value.withRemovePairFromPyramid(
+                            PyramidCardPos(r, c),
+                            PyramidCardPos(selected.row, selected.col),
+                          );
+                          return;
+                        }
+                        state.value = state.value.copyWith(selected: PyramidCardPos(r, c));
+                      },
+                      canMoveCardHere: (_) => false,
+                    ),
+                  ),
+                ),
               );
             }),
           );
@@ -431,7 +464,14 @@ class PyramidSolitaire extends HookConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               spacing: spacing,
               children: [
-                Expanded(child: buildPyramid()),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      buildPyramid(),
+                      buildPyramidCards(),
+                    ],
+                  ),
+                ),
                 SizedBox(width: spacing),
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,

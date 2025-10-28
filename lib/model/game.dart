@@ -5,12 +5,14 @@ enum Game {
   golf,
   klondike,
   freeCell,
-  spider;
+  spider,
+  pyramid;
 
   String get title => switch (this) {
         Game.golf => 'Golf Solitaire',
         Game.klondike => 'Solitaire',
         Game.freeCell => 'Free Cell',
         Game.spider => 'Spider Solitaire',
+        Game.pyramid => 'Pyramid Solitaire',
       };
 }

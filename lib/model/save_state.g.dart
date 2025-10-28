@@ -53,6 +53,7 @@ const _$GameEnumMap = {
   Game.klondike: 'klondike',
   Game.freeCell: 'freeCell',
   Game.spider: 'spider',
+  Game.pyramid: 'pyramid',
 };
 
 const _$AchievementEnumMap = {

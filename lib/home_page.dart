@@ -17,6 +17,7 @@ import 'package:solitaire/game_view.dart';
 import 'package:solitaire/games/free_cell.dart';
 import 'package:solitaire/games/golf_solitaire.dart';
 import 'package:solitaire/games/solitaire.dart';
+import 'package:solitaire/games/pyramid_solitaire.dart';
 import 'package:solitaire/games/spider_solitaire.dart';
 import 'package:solitaire/model/background.dart';
 import 'package:solitaire/model/difficulty.dart';
@@ -54,6 +55,10 @@ class HomePage extends ConsumerWidget {
               startWithTutorial: startWithTutorial,
             ),
         Game.spider: (Difficulty difficulty, bool startWithTutorial) => SpiderSolitaire(
+              difficulty: difficulty,
+              startWithTutorial: startWithTutorial,
+            ),
+        Game.pyramid: (Difficulty difficulty, bool startWithTutorial) => PyramidSolitaire(
               difficulty: difficulty,
               startWithTutorial: startWithTutorial,
             ),

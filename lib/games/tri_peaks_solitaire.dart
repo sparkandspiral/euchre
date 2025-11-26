@@ -14,7 +14,7 @@ import 'package:solitaire/widgets/game_tutorial.dart';
 import 'package:utils/utils.dart';
 
 class TriPeaksSolitaireState {
-  final List<List<SuitedCard>> tableau; // 4 rows with peaks structure
+  final List<List<SuitedCard?>> tableau; // 4 rows with peaks structure, null = removed card
   final List<SuitedCard> stock;
   final List<SuitedCard> waste;
   final int streak;
@@ -39,16 +39,16 @@ class TriPeaksSolitaireState {
   }) {
     var deck = SuitedCard.deck.shuffled();
 
-    // Tri-Peaks layout: 18 cards in 4 rows forming 3 peaks
-    // Row 0 (top): 3 cards (one per peak)
-    // Row 1: 6 cards
-    // Row 2: 9 cards
-    // Row 3 (bottom): 10 cards in a line (not part of peaks)
-    // Total in tableau: 28 cards
+    // Classic Tri-Peaks layout: 28 cards in 4 rows forming 3 peaks
+    // Row 0 (peaks): 3 cards (indices 0, 1, 2)
+    // Row 1: 6 cards (indices 0-5)
+    // Row 2: 9 cards (indices 0-8)
+    // Row 3 (base): 10 cards (indices 0-9)
+    // Total: 28 cards
 
-    final tableau = <List<SuitedCard>>[];
+    final tableau = <List<SuitedCard?>>[];
     
-    // Row 0: 3 cards (peaks)
+    // Row 0: 3 cards (peaks) - these will be at positions 0, 1, 2
     tableau.add(deck.take(3).toList());
     deck = deck.skip(3).toList();
     
@@ -60,7 +60,7 @@ class TriPeaksSolitaireState {
     tableau.add(deck.take(9).toList());
     deck = deck.skip(9).toList();
     
-    // Row 3: 10 cards (bottom row)
+    // Row 3: 10 cards (bottom row - always exposed)
     tableau.add(deck.take(10).toList());
     deck = deck.skip(10).toList();
 
@@ -89,32 +89,39 @@ class TriPeaksSolitaireState {
       waste.isEmpty || distanceMapper.getDistance(waste.last, card) == 1;
 
   // Check if a card is exposed (not covered by any cards in the row below)
+  // Classic Tri-Peaks coverage pattern:
+  // Row 0: card at index i is covered by cards at row 1 indices [i*2, i*2+1]
+  // Row 1: card at index i is covered by cards at row 2 indices based on peak group
+  // Row 2: card at index i is covered by cards at row 3 indices [i, i+1]
   bool isCardExposed(int row, int col) {
+    final card = tableau[row][col];
+    if (card == null) return false; // Card already removed
     if (row == 3) return true; // Bottom row is always exposed
 
-    // For rows 0-2, check if any cards in the next row cover this card
-    // A card at (row, col) is covered by cards at (row+1, col) and (row+1, col+1) for peaks
-    // But we need to handle the three-peak structure
-
-    // Peak structure coverage:
-    // Row 0 (positions 0,1,2) -> covered by Row 1 (positions 0-1, 2-3, 4-5)
-    // Row 1 (positions 0-5) -> covered by Row 2 (positions 0-8)
-    // Row 2 (positions 0-8) -> covered by Row 3 (positions 0-9)
-
     if (row == 0) {
-      // Three peaks at top
+      // Peak cards: Each peak (0, 1, 2) is covered by 2 cards in row 1
       final leftChild = col * 2;
       final rightChild = col * 2 + 1;
-      return tableau[1].length <= leftChild || tableau[1].length <= rightChild;
+      return tableau[1][leftChild] == null && tableau[1][rightChild] == null;
     } else if (row == 1) {
-      // Second row
-      final leftChild = (col ~/ 2) * 3 + (col % 2) * 1;
-      final rightChild = leftChild + 1;
-      return tableau[2].length <= leftChild || tableau[2].length <= rightChild;
+      // Row 1: Covered by row 2 cards
+      // Each pair in row 1 corresponds to a group of 3 in row 2
+      final peakGroup = col ~/ 2; // Which peak (0, 1, or 2)
+      final posInPair = col % 2; // Position within pair (0 or 1)
+      final baseIndex = peakGroup * 3;
+      
+      if (posInPair == 0) {
+        // Left card of pair: covered by left and middle of trio
+        return tableau[2][baseIndex] == null && tableau[2][baseIndex + 1] == null;
+      } else {
+        // Right card of pair: covered by middle and right of trio
+        return tableau[2][baseIndex + 1] == null && tableau[2][baseIndex + 2] == null;
+      }
     } else if (row == 2) {
-      // Third row
-      final childIndex = col;
-      return tableau[3].length <= childIndex || tableau[3].length <= childIndex + 1;
+      // Row 2: Covered by row 3 cards
+      final leftChild = col;
+      final rightChild = col + 1;
+      return tableau[3][leftChild] == null && tableau[3][rightChild] == null;
     }
 
     return true;
@@ -122,12 +129,10 @@ class TriPeaksSolitaireState {
 
   TriPeaksSolitaireState withSelection(int row, int col) {
     final card = tableau[row][col];
-    final newTableau = tableau.mapIndexed((r, cards) {
-      if (r == row) {
-        return [...cards]..removeAt(col);
-      }
-      return [...cards];
-    }).toList();
+    if (card == null) return this;
+
+    final newTableau = tableau.map((r) => [...r]).toList();
+    newTableau[row][col] = null;
 
     final newStreak = streak + 1;
     return TriPeaksSolitaireState(
@@ -155,14 +160,15 @@ class TriPeaksSolitaireState {
 
   TriPeaksSolitaireState withUndo() => history.last;
 
-  bool get isVictory => tableau.every((row) => row.isEmpty);
+  bool get isVictory => tableau.every((row) => row.every((card) => card == null));
 
   bool get hasAvailableMoves {
     if (canDraw) return true;
     
     for (var row = 0; row < tableau.length; row++) {
       for (var col = 0; col < tableau[row].length; col++) {
-        if (isCardExposed(row, col) && canSelect(tableau[row][col])) {
+        final card = tableau[row][col];
+        if (card != null && isCardExposed(row, col) && canSelect(card)) {
           return true;
         }
       }
@@ -243,316 +249,176 @@ class TriPeaksSolitaire extends HookConsumerWidget {
           .read(achievementServiceProvider)
           .checkTriPeaksSolitaireCompletionAchievements(state: state.value, difficulty: difficulty),
       builder: (context, constraints, cardBack, autoMoveEnabled, gameKey) {
-        final axis = constraints.largestAxis;
         final minSize = constraints.smallest.longestSide;
-        final spacing = minSize / 100;
+        final spacing = minSize / 80;
 
         final sizeMultiplier = constraints.findCardSizeMultiplier(
-          maxRows: axis == Axis.horizontal ? 5 : 10,
-          maxCols: axis == Axis.horizontal ? 12 : 10,
+          maxRows: 7,
+          maxCols: 12,
           spacing: spacing,
         );
 
         final cardWidth = 69 * sizeMultiplier;
         final cardHeight = 93 * sizeMultiplier;
 
-        // Build the three peaks layout
-        Widget buildTriPeaks() {
-          return Stack(
-            key: tableauKey,
-            children: [
-              // Row 3 (bottom) - 10 cards in a line
-              Positioned(
-                top: cardHeight * 3 + spacing * 3,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: SizedBox(
-                    width: (cardWidth + spacing) * 10 - spacing,
-                    height: cardHeight,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: List.generate(state.value.tableau[3].length, (col) {
-                        final card = state.value.tableau[3][col];
-                        final isExposed = state.value.isCardExposed(3, col);
-                        final canSelect = isExposed && state.value.canSelect(card);
-                        
-                        return Padding(
-                          padding: EdgeInsets.only(right: col < state.value.tableau[3].length - 1 ? spacing : 0),
-                          child: Opacity(
-                            opacity: !isExposed ? 0.7 : 1.0,
-                            child: Container(
-                              decoration: canSelect
-                                  ? BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.green.withOpacity(0.6),
-                                          blurRadius: 12,
-                                          spreadRadius: 2,
-                                        ),
-                                      ],
-                                    )
-                                  : null,
-                              child: SizedBox(
-                                width: cardWidth,
-                                height: cardHeight,
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                ),
+        // Build a single card widget
+        Widget buildCard(int row, int col) {
+          final card = state.value.tableau[row][col];
+          final isExposed = card != null && state.value.isCardExposed(row, col);
+          final canSelect = card != null && isExposed && state.value.canSelect(card);
+
+          return SizedBox(
+            width: cardWidth,
+            height: cardHeight,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: canSelect
+                  ? () {
+                      ref.read(audioServiceProvider).playPlace();
+                      state.value = state.value.withSelection(row, col);
+                    }
+                  : null,
+              child: CardLinearGroup<SuitedCard, dynamic>(
+                value: 'card-$row-$col',
+                values: card == null ? const <SuitedCard>[] : [card],
+                maxGrabStackSize: 0,
+                cardOffset: Offset.zero,
+                canCardBeGrabbed: (_, __) => false,
+                isCardFlipped: card == null ? null : (_, __) => !isExposed, // Face down if not exposed
               ),
-              // Row 2 - 9 cards
-              Positioned(
-                top: cardHeight * 2 + spacing * 2,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: SizedBox(
-                    width: (cardWidth + spacing) * 9 - spacing,
-                    height: cardHeight,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: List.generate(state.value.tableau[2].length, (col) {
-                        final card = state.value.tableau[2][col];
-                        final isExposed = state.value.isCardExposed(2, col);
-                        final canSelect = isExposed && state.value.canSelect(card);
-                        
-                        return Padding(
-                          padding: EdgeInsets.only(right: col < state.value.tableau[2].length - 1 ? spacing : 0),
-                          child: Opacity(
-                            opacity: !isExposed ? 0.7 : 1.0,
-                            child: Container(
-                              decoration: canSelect
-                                  ? BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.green.withOpacity(0.6),
-                                          blurRadius: 12,
-                                          spreadRadius: 2,
-                                        ),
-                                      ],
-                                    )
-                                  : null,
-                              child: SizedBox(
-                                width: cardWidth,
-                                height: cardHeight,
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                ),
-              ),
-              // Row 1 - 6 cards
-              Positioned(
-                top: cardHeight + spacing,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: SizedBox(
-                    width: (cardWidth + spacing) * 6 - spacing,
-                    height: cardHeight,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: List.generate(state.value.tableau[1].length, (col) {
-                        final card = state.value.tableau[1][col];
-                        final isExposed = state.value.isCardExposed(1, col);
-                        final canSelect = isExposed && state.value.canSelect(card);
-                        
-                        return Padding(
-                          padding: EdgeInsets.only(right: col < state.value.tableau[1].length - 1 ? spacing : 0),
-                          child: Opacity(
-                            opacity: !isExposed ? 0.7 : 1.0,
-                            child: Container(
-                              decoration: canSelect
-                                  ? BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.green.withOpacity(0.6),
-                                          blurRadius: 12,
-                                          spreadRadius: 2,
-                                        ),
-                                      ],
-                                    )
-                                  : null,
-                              child: SizedBox(
-                                width: cardWidth,
-                                height: cardHeight,
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                ),
-              ),
-              // Row 0 (top) - 3 cards (peaks)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: SizedBox(
-                    width: (cardWidth + spacing) * 3 - spacing,
-                    height: cardHeight,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: List.generate(state.value.tableau[0].length, (col) {
-                        final card = state.value.tableau[0][col];
-                        final isExposed = state.value.isCardExposed(0, col);
-                        final canSelect = isExposed && state.value.canSelect(card);
-                        
-                        return Padding(
-                          padding: EdgeInsets.only(right: col < state.value.tableau[0].length - 1 ? spacing : 0),
-                          child: Opacity(
-                            opacity: !isExposed ? 0.7 : 1.0,
-                            child: Container(
-                              decoration: canSelect
-                                  ? BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.green.withOpacity(0.6),
-                                          blurRadius: 12,
-                                          spreadRadius: 2,
-                                        ),
-                                      ],
-                                    )
-                                  : null,
-                              child: SizedBox(
-                                width: cardWidth,
-                                height: cardHeight,
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           );
         }
 
-        Widget buildTriPeaksCards() {
+        // Build the three peaks layout with proper spacing
+        Widget buildTriPeaks() {
+          final peakSpacing = cardWidth * 0.8; // Space between peaks
+          
           return Stack(
+            key: tableauKey,
             children: [
-              // Row 3 cards
+              // Row 3 (bottom) - 10 cards
               Positioned(
                 top: cardHeight * 3 + spacing * 3,
                 left: 0,
                 right: 0,
                 child: Center(
-                  child: SizedBox(
-                    width: (cardWidth + spacing) * 10 - spacing,
-                    height: cardHeight,
-                    child: CardLinearGroup<SuitedCard, dynamic>(
-                      value: 'row-3',
-                      values: state.value.tableau[3],
-                      maxGrabStackSize: 0,
-                      cardOffset: Offset(cardWidth + spacing, 0),
-                      canCardBeGrabbed: (_, __) => false,
-                      onCardPressed: (card) {
-                        final col = state.value.tableau[3].indexOf(card);
-                        if (col == -1) return;
-                        if (state.value.isCardExposed(3, col) && state.value.canSelect(card)) {
-                          ref.read(audioServiceProvider).playPlace();
-                          state.value = state.value.withSelection(3, col);
-                        }
-                      },
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(10, (col) {
+                      return Padding(
+                        padding: EdgeInsets.only(left: col > 0 ? spacing * 0.5 : 0),
+                        child: buildCard(3, col),
+                      );
+                    }),
                   ),
                 ),
               ),
-              // Row 2 cards
+              // Row 2 - 9 cards (3 groups of 3)
               Positioned(
                 top: cardHeight * 2 + spacing * 2,
                 left: 0,
                 right: 0,
                 child: Center(
-                  child: SizedBox(
-                    width: (cardWidth + spacing) * 9 - spacing,
-                    height: cardHeight,
-                    child: CardLinearGroup<SuitedCard, dynamic>(
-                      value: 'row-2',
-                      values: state.value.tableau[2],
-                      maxGrabStackSize: 0,
-                      cardOffset: Offset(cardWidth + spacing, 0),
-                      canCardBeGrabbed: (_, __) => false,
-                      onCardPressed: (card) {
-                        final col = state.value.tableau[2].indexOf(card);
-                        if (col == -1) return;
-                        if (state.value.isCardExposed(2, col) && state.value.canSelect(card)) {
-                          ref.read(audioServiceProvider).playPlace();
-                          state.value = state.value.withSelection(2, col);
-                        }
-                      },
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // First peak group (3 cards)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(3, (i) {
+                          return Padding(
+                            padding: EdgeInsets.only(left: i > 0 ? spacing * 0.5 : 0),
+                            child: buildCard(2, i),
+                          );
+                        }),
+                      ),
+                      SizedBox(width: peakSpacing),
+                      // Second peak group (3 cards)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(3, (i) {
+                          return Padding(
+                            padding: EdgeInsets.only(left: i > 0 ? spacing * 0.5 : 0),
+                            child: buildCard(2, i + 3),
+                          );
+                        }),
+                      ),
+                      SizedBox(width: peakSpacing),
+                      // Third peak group (3 cards)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(3, (i) {
+                          return Padding(
+                            padding: EdgeInsets.only(left: i > 0 ? spacing * 0.5 : 0),
+                            child: buildCard(2, i + 6),
+                          );
+                        }),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              // Row 1 cards
+              // Row 1 - 6 cards (3 groups of 2)
               Positioned(
                 top: cardHeight + spacing,
                 left: 0,
                 right: 0,
                 child: Center(
-                  child: SizedBox(
-                    width: (cardWidth + spacing) * 6 - spacing,
-                    height: cardHeight,
-                    child: CardLinearGroup<SuitedCard, dynamic>(
-                      value: 'row-1',
-                      values: state.value.tableau[1],
-                      maxGrabStackSize: 0,
-                      cardOffset: Offset(cardWidth + spacing, 0),
-                      canCardBeGrabbed: (_, __) => false,
-                      onCardPressed: (card) {
-                        final col = state.value.tableau[1].indexOf(card);
-                        if (col == -1) return;
-                        if (state.value.isCardExposed(1, col) && state.value.canSelect(card)) {
-                          ref.read(audioServiceProvider).playPlace();
-                          state.value = state.value.withSelection(1, col);
-                        }
-                      },
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // First peak (2 cards)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(2, (i) {
+                          return Padding(
+                            padding: EdgeInsets.only(left: i > 0 ? spacing * 0.5 : 0),
+                            child: buildCard(1, i),
+                          );
+                        }),
+                      ),
+                      SizedBox(width: peakSpacing + cardWidth),
+                      // Second peak (2 cards)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(2, (i) {
+                          return Padding(
+                            padding: EdgeInsets.only(left: i > 0 ? spacing * 0.5 : 0),
+                            child: buildCard(1, i + 2),
+                          );
+                        }),
+                      ),
+                      SizedBox(width: peakSpacing + cardWidth),
+                      // Third peak (2 cards)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(2, (i) {
+                          return Padding(
+                            padding: EdgeInsets.only(left: i > 0 ? spacing * 0.5 : 0),
+                            child: buildCard(1, i + 4),
+                          );
+                        }),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              // Row 0 cards (peaks)
+              // Row 0 (peaks) - 3 cards
               Positioned(
                 top: 0,
                 left: 0,
                 right: 0,
                 child: Center(
-                  child: SizedBox(
-                    width: (cardWidth + spacing) * 3 - spacing,
-                    height: cardHeight,
-                    child: CardLinearGroup<SuitedCard, dynamic>(
-                      value: 'row-0',
-                      values: state.value.tableau[0],
-                      maxGrabStackSize: 0,
-                      cardOffset: Offset(cardWidth + spacing, 0),
-                      canCardBeGrabbed: (_, __) => false,
-                      onCardPressed: (card) {
-                        final col = state.value.tableau[0].indexOf(card);
-                        if (col == -1) return;
-                        if (state.value.isCardExposed(0, col) && state.value.canSelect(card)) {
-                          ref.read(audioServiceProvider).playPlace();
-                          state.value = state.value.withSelection(0, col);
-                        }
-                      },
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      buildCard(0, 0),
+                      SizedBox(width: peakSpacing + cardWidth * 2),
+                      buildCard(0, 1),
+                      SizedBox(width: peakSpacing + cardWidth * 2),
+                      buildCard(0, 2),
+                    ],
                   ),
                 ),
               ),
@@ -567,12 +433,7 @@ class TriPeaksSolitaire extends HookConsumerWidget {
             Row(
               children: [
                 Expanded(
-                  child: Stack(
-                    children: [
-                      buildTriPeaks(),
-                      buildTriPeaksCards(),
-                    ],
-                  ),
+                  child: buildTriPeaks(),
                 ),
                 SizedBox(width: spacing * 2),
                 Column(
@@ -629,4 +490,3 @@ class TriPeaksSolitaire extends HookConsumerWidget {
     );
   }
 }
-

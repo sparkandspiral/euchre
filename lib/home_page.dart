@@ -5,7 +5,6 @@ import 'package:solitaire/dialogs/about_dialog.dart';
 import 'package:solitaire/dialogs/achievement_dialog.dart';
 import 'package:solitaire/dialogs/customization_dialog.dart';
 import 'package:solitaire/dialogs/settings_dialog.dart';
-import 'package:solitaire/dialogs/support_dialog.dart';
 import 'package:solitaire/game_view.dart';
 import 'package:solitaire/games/free_cell.dart';
 import 'package:solitaire/games/golf_solitaire.dart';
@@ -124,16 +123,6 @@ class HomePage extends ConsumerWidget {
                   leadingIcon: Icon(Icons.settings),
                   onPressed: () => SettingsDialog.show(context),
                   child: Text('Settings'),
-                ),
-                MenuItemButton(
-                  leadingIcon: Icon(Icons.info),
-                  onPressed: () => SolitaireAboutDialog.show(context),
-                  child: Text('About'),
-                ),
-                MenuItemButton(
-                  leadingIcon: Icon(Icons.favorite),
-                  onPressed: () => SupportDialog.show(context),
-                  child: Text('Support'),
                 ),
               ],
             ),

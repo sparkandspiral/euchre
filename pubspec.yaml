@@ -1,5 +1,5 @@
 name: solitaire
-description: "Collection of card games"
+description: "Daily Solitaire Collection"
 publish_to: 'none'
 version: 1.0.0+12
 
@@ -61,7 +61,7 @@ flutter:
     - assets/sounds/
 
 flutter_launcher_icons: # dart run flutter_launcher_icons
-  image_path: "assets/app_icon.png"
+  image_path: "assets/app_icon.webp"
 
   android: "launcher_icon"
   adaptive_icon_foreground: "assets/cards_with_padding.png"

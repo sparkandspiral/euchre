@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:solitaire/dialogs/about_dialog.dart';
 import 'package:solitaire/dialogs/achievement_dialog.dart';
 import 'package:solitaire/dialogs/customization_dialog.dart';
 import 'package:solitaire/dialogs/settings_dialog.dart';
@@ -109,22 +108,10 @@ class HomePage extends ConsumerWidget {
             ),
           ),
           Tooltip(
-            message: 'More',
-            child: MenuAnchor(
-              alignmentOffset: Offset(-75, 0),
-              builder: (context, controller, child) {
-                return IconButton(
-                  onPressed: () => controller.open(),
-                  icon: Icon(Icons.more_vert),
-                );
-              },
-              menuChildren: [
-                MenuItemButton(
-                  leadingIcon: Icon(Icons.settings),
-                  onPressed: () => SettingsDialog.show(context),
-                  child: Text('Settings'),
-                ),
-              ],
+            message: 'Settings',
+            child: IconButton(
+              icon: Icon(Icons.settings),
+              onPressed: () => SettingsDialog.show(context),
             ),
           ),
         ],

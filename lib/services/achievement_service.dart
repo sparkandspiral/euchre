@@ -5,6 +5,7 @@ import 'package:solitaire/games/free_cell.dart';
 import 'package:solitaire/games/golf_solitaire.dart';
 import 'package:solitaire/games/solitaire.dart';
 import 'package:solitaire/games/spider_solitaire.dart';
+import 'package:solitaire/games/tri_peaks_solitaire.dart';
 import 'package:solitaire/main.dart';
 import 'package:solitaire/model/achievement.dart';
 import 'package:solitaire/model/card_back.dart';
@@ -111,6 +112,21 @@ class AchievementService {
   }) async {
     // Placeholder for completion-based achievements
     // Can add achievements here like "Win with no cards left in stock" etc.
+  }
+
+  Future<void> checkTriPeaksSolitaireMoveAchievements({required TriPeaksSolitaireState state}) async {
+    if (state.longestStreak >= 15) {
+      await _markAchievement(Achievement.peakPerformance);
+    }
+  }
+
+  Future<void> checkTriPeaksSolitaireCompletionAchievements({
+    required TriPeaksSolitaireState state,
+    required Difficulty difficulty,
+  }) async {
+    if (state.stock.length >= 10) {
+      await _markAchievement(Achievement.summitMaster);
+    }
   }
 
   Future<void> deleteAchievement(Achievement achievement) async {

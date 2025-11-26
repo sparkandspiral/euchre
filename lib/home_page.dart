@@ -10,6 +10,7 @@ import 'package:solitaire/games/golf_solitaire.dart';
 import 'package:solitaire/games/solitaire.dart';
 import 'package:solitaire/games/pyramid_solitaire.dart';
 import 'package:solitaire/games/spider_solitaire.dart';
+import 'package:solitaire/games/tri_peaks_solitaire.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/providers/save_state_notifier.dart';
@@ -39,6 +40,10 @@ class HomePage extends ConsumerWidget {
               difficulty: difficulty,
               startWithTutorial: startWithTutorial,
             ),
+        Game.triPeaks: (Difficulty difficulty, bool startWithTutorial) => TriPeaksSolitaire(
+              difficulty: difficulty,
+              startWithTutorial: startWithTutorial,
+            ),
       };
 
   // Game-specific gradient colors
@@ -48,6 +53,7 @@ class HomePage extends ConsumerWidget {
         Game.freeCell: [Color(0xFFE63946), Color(0xFFC41E3A)],
         Game.pyramid: [Color(0xFFE67E22), Color(0xFFD35400)],
         Game.golf: [Color(0xFF27AE60), Color(0xFF1E8449)],
+        Game.triPeaks: [Color(0xFFFFD700), Color(0xFFB8860B)],
       };
 
   // Game icons
@@ -63,6 +69,8 @@ class HomePage extends ConsumerWidget {
         return Icons.change_history;
       case Game.golf:
         return Icons.terrain;
+      case Game.triPeaks:
+        return Icons.filter_hdr;
     }
   }
 

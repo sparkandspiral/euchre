@@ -54,6 +54,7 @@ const _$GameEnumMap = {
   Game.freeCell: 'freeCell',
   Game.spider: 'spider',
   Game.pyramid: 'pyramid',
+  Game.triPeaks: 'triPeaks',
 };
 
 const _$AchievementEnumMap = {
@@ -68,6 +69,8 @@ const _$AchievementEnumMap = {
   Achievement.birdie: 'birdie',
   Achievement.cleanSweep: 'cleanSweep',
   Achievement.perfectPlanning: 'perfectPlanning',
+  Achievement.peakPerformance: 'peakPerformance',
+  Achievement.summitMaster: 'summitMaster',
 };
 
 const _$DifficultyEnumMap = {

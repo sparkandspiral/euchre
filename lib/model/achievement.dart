@@ -17,7 +17,9 @@ enum Achievement {
   aceUpYourSleeve('Ace Up Your Sleeve', 'Complete all games in Ace mode.'),
   birdie('Birdie', 'Win an Ace Golf Solitaire game with at least 1 card remaining in the draw pile.'),
   cleanSweep('Clean Sweep', 'Win an Ace Solitaire game without undoing any moves.'),
-  perfectPlanning('Perfect Planning', 'Win an Ace Free Cell game without undoing any moves.');
+  perfectPlanning('Perfect Planning', 'Win an Ace Free Cell game without undoing any moves.'),
+  peakPerformance('Peak Performance', 'In Tri-Peaks, achieve a streak of 15 consecutive cards.'),
+  summitMaster('Summit Master', 'Win a Tri-Peaks game with at least 10 cards remaining in the stock.');
 
   final String name;
   final String description;

@@ -25,6 +25,7 @@ enum Difficulty {
             Game.freeCell => 'Play with one fewer free cell.',
             Game.spider => 'Play with two suits (Spades and Hearts).',
             Game.pyramid => 'Start with one waste card to widen pairing options.',
+            Game.triPeaks => 'Start with one waste card for an easier start.',
           },
         Difficulty.ace => switch (game) {
             Game.golf => 'One card is automatically drawn at the start, and Kings cannot wrap to Aces.',
@@ -34,6 +35,7 @@ enum Difficulty {
               'Play with one fewer free cell and all aces are buried at the bottom of the first four tableaus.',
             Game.spider => 'Play with all four suits - the ultimate challenge!',
             Game.pyramid => 'Aces are buried to the bottom of the stock for a tougher start.',
+            Game.triPeaks => 'Kings cannot wrap to Aces - must plan your moves carefully!',
           },
       };
 

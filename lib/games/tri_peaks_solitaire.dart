@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:card_game/card_game.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
@@ -14,7 +16,8 @@ import 'package:solitaire/widgets/game_tutorial.dart';
 import 'package:utils/utils.dart';
 
 class TriPeaksSolitaireState {
-  final List<List<SuitedCard?>> tableau; // 4 rows with peaks structure, null = removed card
+  final List<List<SuitedCard?>>
+      tableau; // 4 rows with peaks structure, null = removed card
   final List<SuitedCard> stock;
   final List<SuitedCard> waste;
   final int streak;
@@ -47,19 +50,19 @@ class TriPeaksSolitaireState {
     // Total: 28 cards
 
     final tableau = <List<SuitedCard?>>[];
-    
+
     // Row 0: 3 cards (peaks) - these will be at positions 0, 1, 2
     tableau.add(deck.take(3).toList());
     deck = deck.skip(3).toList();
-    
+
     // Row 1: 6 cards
     tableau.add(deck.take(6).toList());
     deck = deck.skip(6).toList();
-    
+
     // Row 2: 9 cards
     tableau.add(deck.take(9).toList());
     deck = deck.skip(9).toList();
-    
+
     // Row 3: 10 cards (bottom row - always exposed)
     tableau.add(deck.take(10).toList());
     deck = deck.skip(10).toList();
@@ -82,8 +85,9 @@ class TriPeaksSolitaireState {
     );
   }
 
-  SuitedCardDistanceMapper get distanceMapper =>
-      canRollover ? SuitedCardDistanceMapper.rollover : SuitedCardDistanceMapper.aceToKing;
+  SuitedCardDistanceMapper get distanceMapper => canRollover
+      ? SuitedCardDistanceMapper.rollover
+      : SuitedCardDistanceMapper.aceToKing;
 
   bool canSelect(SuitedCard card) =>
       waste.isEmpty || distanceMapper.getDistance(waste.last, card) == 1;
@@ -109,13 +113,15 @@ class TriPeaksSolitaireState {
       final peakGroup = col ~/ 2; // Which peak (0, 1, or 2)
       final posInPair = col % 2; // Position within pair (0 or 1)
       final baseIndex = peakGroup * 3;
-      
+
       if (posInPair == 0) {
         // Left card of pair: covered by left and middle of trio
-        return tableau[2][baseIndex] == null && tableau[2][baseIndex + 1] == null;
+        return tableau[2][baseIndex] == null &&
+            tableau[2][baseIndex + 1] == null;
       } else {
         // Right card of pair: covered by middle and right of trio
-        return tableau[2][baseIndex + 1] == null && tableau[2][baseIndex + 2] == null;
+        return tableau[2][baseIndex + 1] == null &&
+            tableau[2][baseIndex + 2] == null;
       }
     } else if (row == 2) {
       // Row 2: Covered by row 3 cards
@@ -160,11 +166,12 @@ class TriPeaksSolitaireState {
 
   TriPeaksSolitaireState withUndo() => history.last;
 
-  bool get isVictory => tableau.every((row) => row.every((card) => card == null));
+  bool get isVictory =>
+      tableau.every((row) => row.every((card) => card == null));
 
   bool get hasAvailableMoves {
     if (canDraw) return true;
-    
+
     for (var row = 0; row < tableau.length; row++) {
       for (var col = 0; col < tableau[row].length; col++) {
         final card = tableau[row][col];
@@ -187,7 +194,8 @@ class TriPeaksSolitaire extends HookConsumerWidget {
     this.startWithTutorial = false,
   });
 
-  TriPeaksSolitaireState get initialState => TriPeaksSolitaireState.getInitialState(
+  TriPeaksSolitaireState get initialState =>
+      TriPeaksSolitaireState.getInitialState(
         startWithWaste: difficulty.index >= Difficulty.royal.index,
         canRollover: difficulty != Difficulty.ace,
       );
@@ -197,7 +205,9 @@ class TriPeaksSolitaire extends HookConsumerWidget {
     final state = useState(initialState);
     useOnListenableChange(
       state,
-      () => ref.read(achievementServiceProvider).checkTriPeaksSolitaireMoveAchievements(state: state.value),
+      () => ref
+          .read(achievementServiceProvider)
+          .checkTriPeaksSolitaireMoveAchievements(state: state.value),
     );
 
     final tableauKey = useMemoized(() => GlobalKey());
@@ -232,7 +242,8 @@ class TriPeaksSolitaire extends HookConsumerWidget {
 
     useOneTimeEffect(() {
       if (startWithTutorial) {
-        Future.delayed(Duration(milliseconds: 200)).then((_) => startTutorial());
+        Future.delayed(Duration(milliseconds: 200))
+            .then((_) => startTutorial());
       }
       return null;
     });
@@ -241,31 +252,41 @@ class TriPeaksSolitaire extends HookConsumerWidget {
       game: Game.triPeaks,
       difficulty: difficulty,
       onNewGame: () => state.value = initialState,
-      onRestart: () => state.value = state.value.history.firstOrNull ?? state.value,
-      onUndo: state.value.history.isEmpty ? null : () => state.value = state.value.withUndo(),
+      onRestart: () =>
+          state.value = state.value.history.firstOrNull ?? state.value,
+      onUndo: state.value.history.isEmpty
+          ? null
+          : () => state.value = state.value.withUndo(),
       isVictory: state.value.isVictory,
       onTutorial: startTutorial,
       onVictory: () => ref
           .read(achievementServiceProvider)
-          .checkTriPeaksSolitaireCompletionAchievements(state: state.value, difficulty: difficulty),
+          .checkTriPeaksSolitaireCompletionAchievements(
+              state: state.value, difficulty: difficulty),
       builder: (context, constraints, cardBack, autoMoveEnabled, gameKey) {
+        final axis = constraints.largestAxis;
         final minSize = constraints.smallest.longestSide;
-        final spacing = minSize / 80;
+        final spacing = minSize / 100;
+        final maxRows = axis == Axis.vertical ? 9.0 : 6.0;
+        final maxCols = axis == Axis.vertical ? 10.6 : 13.0;
 
         final sizeMultiplier = constraints.findCardSizeMultiplier(
-          maxRows: 7,
-          maxCols: 12,
+          maxRows: maxRows,
+          maxCols: maxCols,
           spacing: spacing,
         );
 
         final cardWidth = 69 * sizeMultiplier;
         final cardHeight = 93 * sizeMultiplier;
+        final peakSpacing = cardWidth * 0.45;
+        final spacingHalf = spacing * 0.5;
 
         // Build a single card widget
         Widget buildCard(int row, int col) {
           final card = state.value.tableau[row][col];
           final isExposed = card != null && state.value.isCardExposed(row, col);
-          final canSelect = card != null && isExposed && state.value.canSelect(card);
+          final canSelect =
+              card != null && isExposed && state.value.canSelect(card);
 
           return SizedBox(
             width: cardWidth,
@@ -284,7 +305,9 @@ class TriPeaksSolitaire extends HookConsumerWidget {
                 maxGrabStackSize: 0,
                 cardOffset: Offset.zero,
                 canCardBeGrabbed: (_, __) => false,
-                isCardFlipped: card == null ? null : (_, __) => !isExposed, // Face down if not exposed
+                isCardFlipped: card == null
+                    ? null
+                    : (_, __) => !isExposed, // Face down if not exposed
               ),
             ),
           );
@@ -292,43 +315,54 @@ class TriPeaksSolitaire extends HookConsumerWidget {
 
         // Build the three peaks layout with proper spacing
         Widget buildTriPeaks() {
-          final peakSpacing = cardWidth * 0.8; // Space between peaks
-          
-          return Stack(
+          final row3Width = cardWidth * 10 + spacingHalf * 9;
+          final row2GroupWidth = cardWidth * 3 + spacingHalf * 2;
+          final row2Width = row2GroupWidth * 3 + peakSpacing * 2;
+          final row1PairWidth = cardWidth * 2 + spacingHalf;
+          final row1Width = row1PairWidth * 3 + (peakSpacing + cardWidth) * 2;
+          final row0Width = cardWidth * 3 + (peakSpacing + cardWidth * 2) * 2;
+          final tableauWidth =
+              [row3Width, row2Width, row1Width, row0Width].reduce(max);
+
+          return SizedBox(
+            width: tableauWidth,
+            height: cardHeight * 4 + spacing * 3,
             key: tableauKey,
-            children: [
-              // Row 3 (bottom) - 10 cards
-              Positioned(
-                top: cardHeight * 3 + spacing * 3,
-                left: 0,
-                right: 0,
-                child: Center(
+            child: Stack(
+              children: [
+                // Row 3 (bottom) - 10 cards
+                Positioned(
+                  top: cardHeight * 3 + spacing * 3,
+                  left: 0,
+                  right: 0,
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.max,
                     children: List.generate(10, (col) {
                       return Padding(
-                        padding: EdgeInsets.only(left: col > 0 ? spacing * 0.5 : 0),
+                        padding:
+                            EdgeInsets.only(left: col > 0 ? spacingHalf : 0),
                         child: buildCard(3, col),
                       );
                     }),
                   ),
                 ),
-              ),
-              // Row 2 - 9 cards (3 groups of 3)
-              Positioned(
-                top: cardHeight * 2 + spacing * 2,
-                left: 0,
-                right: 0,
-                child: Center(
+                // Row 2 - 9 cards (3 groups of 3)
+                Positioned(
+                  top: cardHeight * 2 + spacing * 2,
+                  left: 0,
+                  right: 0,
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.max,
                     children: [
                       // First peak group (3 cards)
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: List.generate(3, (i) {
                           return Padding(
-                            padding: EdgeInsets.only(left: i > 0 ? spacing * 0.5 : 0),
+                            padding:
+                                EdgeInsets.only(left: i > 0 ? spacingHalf : 0),
                             child: buildCard(2, i),
                           );
                         }),
@@ -339,7 +373,8 @@ class TriPeaksSolitaire extends HookConsumerWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: List.generate(3, (i) {
                           return Padding(
-                            padding: EdgeInsets.only(left: i > 0 ? spacing * 0.5 : 0),
+                            padding:
+                                EdgeInsets.only(left: i > 0 ? spacingHalf : 0),
                             child: buildCard(2, i + 3),
                           );
                         }),
@@ -350,7 +385,8 @@ class TriPeaksSolitaire extends HookConsumerWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: List.generate(3, (i) {
                           return Padding(
-                            padding: EdgeInsets.only(left: i > 0 ? spacing * 0.5 : 0),
+                            padding:
+                                EdgeInsets.only(left: i > 0 ? spacingHalf : 0),
                             child: buildCard(2, i + 6),
                           );
                         }),
@@ -358,22 +394,22 @@ class TriPeaksSolitaire extends HookConsumerWidget {
                     ],
                   ),
                 ),
-              ),
-              // Row 1 - 6 cards (3 groups of 2)
-              Positioned(
-                top: cardHeight + spacing,
-                left: 0,
-                right: 0,
-                child: Center(
+                // Row 1 - 6 cards (3 groups of 2)
+                Positioned(
+                  top: cardHeight + spacing,
+                  left: 0,
+                  right: 0,
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.max,
                     children: [
                       // First peak (2 cards)
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: List.generate(2, (i) {
                           return Padding(
-                            padding: EdgeInsets.only(left: i > 0 ? spacing * 0.5 : 0),
+                            padding:
+                                EdgeInsets.only(left: i > 0 ? spacingHalf : 0),
                             child: buildCard(1, i),
                           );
                         }),
@@ -384,7 +420,8 @@ class TriPeaksSolitaire extends HookConsumerWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: List.generate(2, (i) {
                           return Padding(
-                            padding: EdgeInsets.only(left: i > 0 ? spacing * 0.5 : 0),
+                            padding:
+                                EdgeInsets.only(left: i > 0 ? spacingHalf : 0),
                             child: buildCard(1, i + 2),
                           );
                         }),
@@ -395,7 +432,8 @@ class TriPeaksSolitaire extends HookConsumerWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: List.generate(2, (i) {
                           return Padding(
-                            padding: EdgeInsets.only(left: i > 0 ? spacing * 0.5 : 0),
+                            padding:
+                                EdgeInsets.only(left: i > 0 ? spacingHalf : 0),
                             child: buildCard(1, i + 4),
                           );
                         }),
@@ -403,15 +441,14 @@ class TriPeaksSolitaire extends HookConsumerWidget {
                     ],
                   ),
                 ),
-              ),
-              // Row 0 (peaks) - 3 cards
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: Center(
+                // Row 0 (peaks) - 3 cards
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.max,
                     children: [
                       buildCard(0, 0),
                       SizedBox(width: peakSpacing + cardWidth * 2),
@@ -421,69 +458,114 @@ class TriPeaksSolitaire extends HookConsumerWidget {
                     ],
                   ),
                 ),
-              ),
+              ],
+            ),
+          );
+        }
+
+        final streakIndicator = state.value.streak > 0
+            ? Container(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.amber.withOpacity(0.4),
+                      blurRadius: 8,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Text(
+                  'Streak: ${state.value.streak}',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16 * sizeMultiplier,
+                  ),
+                ),
+              )
+            : null;
+
+        final stockDeck = CardDeck<SuitedCard, dynamic>.flipped(
+          key: stockKey,
+          value: 'stock',
+          values: state.value.stock,
+          onCardPressed: (_) {
+            if (state.value.canDraw) {
+              ref.read(audioServiceProvider).playDraw();
+              state.value = state.value.withDraw();
+            }
+          },
+        );
+
+        final wasteDeck = CardDeck<SuitedCard, dynamic>(
+          key: wasteKey,
+          value: 'waste',
+          values: state.value.waste,
+        );
+
+        Widget buildPiles() {
+          final deckDisplay = axis == Axis.vertical
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    stockDeck,
+                    SizedBox(width: spacing * 2),
+                    wasteDeck,
+                  ],
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  spacing: spacing * 2,
+                  children: [
+                    stockDeck,
+                    wasteDeck,
+                  ],
+                );
+
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            spacing: spacing * 2,
+            children: [
+              if (streakIndicator != null) streakIndicator,
+              deckDisplay,
             ],
           );
         }
 
         return CardGame<SuitedCard, dynamic>(
           gameKey: gameKey,
-          style: playingCardStyle(sizeMultiplier: sizeMultiplier, cardBack: cardBack),
+          style: playingCardStyle(
+              sizeMultiplier: sizeMultiplier, cardBack: cardBack),
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: buildTriPeaks(),
-                ),
-                SizedBox(width: spacing * 2),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  spacing: spacing * 3,
-                  children: [
-                    // Streak indicator
-                    if (state.value.streak > 0)
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.amber.withOpacity(0.4),
-                              blurRadius: 8,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          'Streak: ${state.value.streak}',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16 * sizeMultiplier,
-                          ),
-                        ),
-                      ),
-                    CardDeck<SuitedCard, dynamic>.flipped(
-                      key: stockKey,
-                      value: 'stock',
-                      values: state.value.stock,
-                      onCardPressed: (_) {
-                        if (state.value.canDraw) {
-                          ref.read(audioServiceProvider).playDraw();
-                          state.value = state.value.withDraw();
-                        }
-                      },
+            if (axis == Axis.horizontal)
+              Row(
+                children: [
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: buildTriPeaks(),
                     ),
-                    CardDeck<SuitedCard, dynamic>(
-                      key: wasteKey,
-                      value: 'waste',
-                      values: state.value.waste,
+                  ),
+                  SizedBox(width: spacing * 2),
+                  buildPiles(),
+                ],
+              )
+            else
+              Column(
+                children: [
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: buildTriPeaks(),
                     ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                  SizedBox(height: spacing * 2),
+                  buildPiles(),
+                ],
+              ),
           ],
         );
       },

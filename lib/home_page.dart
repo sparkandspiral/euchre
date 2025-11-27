@@ -56,6 +56,16 @@ class HomePage extends ConsumerWidget {
         Game.triPeaks: [Color(0xFFFFD700), Color(0xFFB8860B)],
       };
 
+  // Game logos
+  Map<Game, String> get gameLogos => {
+        Game.klondike: 'assets/logos/klondike.png',
+        Game.spider: 'assets/logos/spider.png',
+        Game.freeCell: 'assets/logos/freecell.png',
+        Game.pyramid: 'assets/logos/pyramid.png',
+        Game.golf: 'assets/logos/golf.png',
+        Game.triPeaks: 'assets/logos/tripeaks.png',
+      };
+
   // Game icons
   IconData getGameIcon(Game game) {
     switch (game) {
@@ -147,14 +157,12 @@ class HomePage extends ConsumerWidget {
               final game = gameBuilders.keys.elementAt(index);
               final builder = gameBuilders[game]!;
               final difficulty = saveState.lastPlayedGameDifficulties[game] ?? Difficulty.classic;
-              final gameState = saveState.gameStates[game];
-              final gamesWon = gameState?.states[difficulty]?.gamesWon ?? 0;
 
               return _GameCard(
                 game: game,
-                gamesWon: gamesWon,
                 gradient: gameGradients[game]!,
                 icon: getGameIcon(game),
+                logoAsset: gameLogos[game]!,
                 onTap: () {
                   context.pushReplacement(() => GameView(cardGame: builder(difficulty, false)));
                   ref.read(saveStateNotifierProvider.notifier).saveGameStarted(
@@ -173,16 +181,16 @@ class HomePage extends ConsumerWidget {
 
 class _GameCard extends StatelessWidget {
   final Game game;
-  final int gamesWon;
   final List<Color> gradient;
   final IconData icon;
+  final String logoAsset;
   final VoidCallback onTap;
 
   const _GameCard({
     required this.game,
-    required this.gamesWon,
     required this.gradient,
     required this.icon,
+    required this.logoAsset,
     required this.onTap,
   });
 
@@ -257,43 +265,30 @@ class _GameCard extends StatelessWidget {
                         ],
                       ),
                       Spacer(),
-                      // Games won badge
+                      // Game logo
                       Center(
-                        child: Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.2),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.5),
-                              width: 3,
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              '$gamesWon',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                        child: SizedBox(
+                          width: 225,
+                          height: 225,
+                          child: Image.asset(
+                            logoAsset,
+                            fit: BoxFit.contain,
+                            alignment: Alignment.center,
                           ),
                         ),
                       ),
                       Spacer(),
                       // Play hint
-                      Center(
-                        child: Text(
-                          'Tap to Play',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
+                      // Center(
+                      //   child: Text(
+                      //     'Tap to Play',
+                      //     style: TextStyle(
+                      //       color: Colors.white.withOpacity(0.9),
+                      //       fontSize: 14,
+                      //       fontWeight: FontWeight.w500,
+                      //     ),
+                      //   ),
+                      // ),
                     ],
                   ),
                 ),

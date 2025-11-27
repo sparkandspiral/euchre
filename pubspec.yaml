@@ -64,7 +64,7 @@ flutter_launcher_icons: # dart run flutter_launcher_icons
   image_path: "assets/app_icon.webp"
 
   android: "launcher_icon"
-  adaptive_icon_foreground: "assets/cards_with_padding.png"
+  adaptive_icon_foreground: "assets/app_icon.webp"
   adaptive_icon_background: "#4CAF50"
   min_sdk_android: 21
 
@@ -73,4 +73,4 @@ flutter_launcher_icons: # dart run flutter_launcher_icons
 
   web:
     generate: true
-    image_path: "assets/cards.png"
+    image_path: "assets/app_icon.webp"

@@ -1,4 +1,4 @@
-package com.jlogical.solitaire
+package ca.sparkandspiral.dailysolitaire
 
 import io.flutter.embedding.android.FlutterActivity
 

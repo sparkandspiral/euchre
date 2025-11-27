@@ -268,8 +268,8 @@ class _GameCard extends StatelessWidget {
                       // Game logo
                       Center(
                         child: SizedBox(
-                          width: 225,
-                          height: 225,
+                          width: 158,
+                          height: 158,
                           child: Image.asset(
                             logoAsset,
                             fit: BoxFit.contain,

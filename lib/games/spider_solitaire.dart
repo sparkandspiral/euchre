@@ -6,6 +6,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
+import 'package:solitaire/model/immutable_history.dart';
 import 'package:solitaire/services/achievement_service.dart';
 import 'package:solitaire/services/audio_service.dart';
 // Removed playing_card_style import - custom CardGameStyle is provided here
@@ -38,7 +39,7 @@ class SpiderSolitaireState {
   final int suitCount;
 
   final bool usedUndo;
-  final List<SpiderSolitaireState> history;
+  final ImmutableHistory<SpiderSolitaireState> history;
 
   SpiderSolitaireState({
     required this.hiddenCards,
@@ -56,10 +57,11 @@ class SpiderSolitaireState {
     // 2 suits: 4 sets of each suit
     // 4 suits: 2 sets of each suit
     final suits = CardSuit.values.take(suitCount).toList();
-    final setsPerSuit = 8 ~/ suitCount; // 8 sets total divided by number of suits
+    final setsPerSuit =
+        8 ~/ suitCount; // 8 sets total divided by number of suits
     var deck = <SpiderCard>[];
     var uniqueId = 0;
-    
+
     // Create the required number of sets per suit to get 104 cards total
     for (var suit in suits) {
       for (var setIndex = 0; setIndex < setsPerSuit; setIndex++) {
@@ -78,9 +80,10 @@ class SpiderSolitaireState {
           QueenSuitedCardValue(),
           KingSuitedCardValue(),
         ];
-        
+
         for (var value in values) {
-          deck.add(SpiderCard(SuitedCard(suit: suit, value: value), uniqueId++));
+          deck.add(
+              SpiderCard(SuitedCard(suit: suit, value: value), uniqueId++));
         }
       }
     }
@@ -110,11 +113,12 @@ class SpiderSolitaireState {
       completedSequences: 0,
       suitCount: suitCount,
       usedUndo: false,
-      history: [],
+      history: const ImmutableHistory.empty(),
     );
   }
 
-  int getCardValue(SpiderCard card) => SuitedCardValueMapper.aceAsLowest.getValue(card.card);
+  int getCardValue(SpiderCard card) =>
+      SuitedCardValueMapper.aceAsLowest.getValue(card.card);
 
   bool isValidSequence(List<SpiderCard> cards) {
     if (cards.isEmpty) return true;
@@ -155,22 +159,25 @@ class SpiderSolitaireState {
     return getCardValue(movingBottomCard) + 1 == getCardValue(targetTopCard);
   }
 
-  SpiderSolitaireState withMoveFromColumn(List<SpiderCard> cards, int fromColumn, int toColumn) {
+  SpiderSolitaireState withMoveFromColumn(
+      List<SpiderCard> cards, int fromColumn, int toColumn) {
     if (!canMoveToColumn(cards, toColumn)) {
       return this;
     }
 
     final newRevealedCards = [...revealedCards];
-    newRevealedCards[fromColumn] =
-        newRevealedCards[fromColumn].sublist(0, newRevealedCards[fromColumn].length - cards.length);
+    newRevealedCards[fromColumn] = newRevealedCards[fromColumn]
+        .sublist(0, newRevealedCards[fromColumn].length - cards.length);
     newRevealedCards[toColumn] = [...newRevealedCards[toColumn], ...cards];
 
     final newHiddenCards = [...hiddenCards];
 
     // Reveal hidden card if revealed cards is empty
-    if (newRevealedCards[fromColumn].isEmpty && newHiddenCards[fromColumn].isNotEmpty) {
+    if (newRevealedCards[fromColumn].isEmpty &&
+        newHiddenCards[fromColumn].isNotEmpty) {
       newRevealedCards[fromColumn] = [newHiddenCards[fromColumn].last];
-      newHiddenCards[fromColumn] = [...newHiddenCards[fromColumn]]..removeLast();
+      newHiddenCards[fromColumn] = [...newHiddenCards[fromColumn]]
+        ..removeLast();
     }
 
     var newState = copyWith(
@@ -217,7 +224,7 @@ class SpiderSolitaireState {
         completedSequences: newCompletedSequences,
         suitCount: suitCount,
         usedUndo: usedUndo,
-        history: history + [this],
+        history: history.push(this),
       );
     }
 
@@ -271,7 +278,8 @@ class SpiderSolitaireState {
     // Prefer moving to non-empty columns unless moving a King
     if (validNonEmptyColumns.isNotEmpty) {
       return withMoveFromColumn(cards, column, validNonEmptyColumns.first);
-    } else if (validEmptyColumns.isNotEmpty && cards.first.value == KingSuitedCardValue()) {
+    } else if (validEmptyColumns.isNotEmpty &&
+        cards.first.value == KingSuitedCardValue()) {
       return withMoveFromColumn(cards, column, validEmptyColumns.first);
     }
 
@@ -284,7 +292,8 @@ class SpiderSolitaireState {
 
   bool get isVictory => completedSequences == 8;
 
-  bool get canDeal => stock.length >= 10 && revealedCards.every((column) => column.isNotEmpty);
+  bool get canDeal =>
+      stock.length >= 10 && revealedCards.every((column) => column.isNotEmpty);
 
   SpiderSolitaireState copyWith({
     List<List<SpiderCard>>? hiddenCards,
@@ -294,6 +303,8 @@ class SpiderSolitaireState {
     bool? usedUndo,
     bool saveNewStateToHistory = true,
   }) {
+    final nextHistory = saveNewStateToHistory ? history.push(this) : history;
+
     return SpiderSolitaireState(
       hiddenCards: hiddenCards ?? this.hiddenCards,
       revealedCards: revealedCards ?? this.revealedCards,
@@ -301,7 +312,7 @@ class SpiderSolitaireState {
       completedSequences: completedSequences ?? this.completedSequences,
       suitCount: suitCount,
       usedUndo: usedUndo ?? this.usedUndo,
-      history: history + [if (saveNewStateToHistory) this],
+      history: nextHistory,
     );
   }
 }
@@ -310,7 +321,8 @@ class SpiderSolitaire extends HookConsumerWidget {
   final Difficulty difficulty;
   final bool startWithTutorial;
 
-  const SpiderSolitaire({super.key, required this.difficulty, this.startWithTutorial = false});
+  const SpiderSolitaire(
+      {super.key, required this.difficulty, this.startWithTutorial = false});
 
   int get suitCount => switch (difficulty) {
         Difficulty.classic => 1,
@@ -328,7 +340,9 @@ class SpiderSolitaire extends HookConsumerWidget {
 
     useOnListenableChange(
       state,
-      () => ref.read(achievementServiceProvider).checkSpiderSolitaireMoveAchievements(state: state.value),
+      () => ref
+          .read(achievementServiceProvider)
+          .checkSpiderSolitaireMoveAchievements(state: state.value),
     );
 
     final tableauKey = useMemoized(() => GlobalKey());
@@ -364,7 +378,8 @@ class SpiderSolitaire extends HookConsumerWidget {
 
     useOneTimeEffect(() {
       if (startWithTutorial) {
-        Future.delayed(Duration(milliseconds: 200)).then((_) => startTutorial());
+        Future.delayed(Duration(milliseconds: 200))
+            .then((_) => startTutorial());
       }
       return null;
     });
@@ -373,13 +388,18 @@ class SpiderSolitaire extends HookConsumerWidget {
       game: Game.spider,
       difficulty: difficulty,
       onNewGame: () => state.value = initialState,
-      onRestart: () => state.value = (state.value.history.firstOrNull ?? state.value).copyWith(usedUndo: false),
+      onRestart: () => state.value =
+          (state.value.history.firstOrNull ?? state.value)
+              .copyWith(usedUndo: false),
       onTutorial: startTutorial,
-      onUndo: state.value.history.isEmpty ? null : () => state.value = state.value.withUndo(),
+      onUndo: state.value.history.isEmpty
+          ? null
+          : () => state.value = state.value.withUndo(),
       isVictory: state.value.isVictory,
       onVictory: () => ref
           .read(achievementServiceProvider)
-          .checkSpiderSolitaireCompletionAchievements(difficulty: difficulty, state: state.value),
+          .checkSpiderSolitaireCompletionAchievements(
+              difficulty: difficulty, state: state.value),
       builder: (context, constraints, cardBack, autoMoveEnabled, gameKey) {
         final axis = constraints.largestAxis;
         final minSize = constraints.smallest.longestSide;
@@ -445,13 +465,15 @@ class SpiderSolitaire extends HookConsumerWidget {
                       CardState.regular => Colors.white,
                       CardState.highlighted => Color(0xFF9FC7FF),
                       CardState.error => Color(0xFFFFADAD),
-                    }.withValues(alpha: 0.2),
+                    }
+                        .withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ],
             ),
-            cardBuilder: (value, group, flipped, cardState) => AnimatedFlippable(
+            cardBuilder: (value, group, flipped, cardState) =>
+                AnimatedFlippable(
               duration: Duration(milliseconds: 300),
               curve: Curves.easeInOutCubic,
               isFlipped: flipped,
@@ -467,8 +489,10 @@ class SpiderSolitaire extends HookConsumerWidget {
                       decoration: BoxDecoration(
                         color: switch (cardState) {
                           CardState.regular => null,
-                          CardState.highlighted => Color(0xFF9FC7FF).withValues(alpha: 0.5),
-                          CardState.error => Color(0xFFFFADAD).withValues(alpha: 0.5),
+                          CardState.highlighted =>
+                            Color(0xFF9FC7FF).withValues(alpha: 0.5),
+                          CardState.error =>
+                            Color(0xFFFFADAD).withValues(alpha: 0.5),
                         },
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -514,9 +538,10 @@ class SpiderSolitaire extends HookConsumerWidget {
                     children: List<Widget>.generate(10, (i) {
                       final hiddenSpiderCards = state.value.hiddenCards[i];
                       final revealedSpiderCards = state.value.revealedCards[i];
-                      
+
                       // Combined list for order/flip state
-                      final allSpiderCards = hiddenSpiderCards + revealedSpiderCards;
+                      final allSpiderCards =
+                          hiddenSpiderCards + revealedSpiderCards;
 
                       return CardLinearGroup<SpiderCard, dynamic>(
                         value: i,
@@ -526,29 +551,37 @@ class SpiderSolitaire extends HookConsumerWidget {
                         canCardBeGrabbed: (_, card) {
                           // Check if card is in revealed cards
                           final cardIndex = allSpiderCards.indexOf(card);
-                          if (cardIndex < hiddenSpiderCards.length) return false;
-                          
+                          if (cardIndex < hiddenSpiderCards.length)
+                            return false;
+
                           // Get spider cards subsequence
-                          final revealedIndex = cardIndex - hiddenSpiderCards.length;
-                          final subsequence = revealedSpiderCards.sublist(revealedIndex);
+                          final revealedIndex =
+                              cardIndex - hiddenSpiderCards.length;
+                          final subsequence =
+                              revealedSpiderCards.sublist(revealedIndex);
                           return state.value.isValidSequence(subsequence);
                         },
-                        isCardFlipped: (_, card) => hiddenSpiderCards.contains(card),
+                        isCardFlipped: (_, card) =>
+                            hiddenSpiderCards.contains(card),
                         onCardPressed: (card) {
                           final cardIndex = allSpiderCards.indexOf(card);
                           if (cardIndex < hiddenSpiderCards.length) return;
 
-                          final revealedIndex = cardIndex - hiddenSpiderCards.length;
-                          final spiderCards = revealedSpiderCards.sublist(revealedIndex);
+                          final revealedIndex =
+                              cardIndex - hiddenSpiderCards.length;
+                          final spiderCards =
+                              revealedSpiderCards.sublist(revealedIndex);
 
-                          final newState = state.value.withAutoMove(i, spiderCards);
+                          final newState =
+                              state.value.withAutoMove(i, spiderCards);
                           if (newState != null) {
                             ref.read(audioServiceProvider).playPlace();
                             state.value = newState;
                           }
                         },
                         canMoveCardHere: (move) {
-                          return state.value.canMoveToColumn(move.cardValues, i);
+                          return state.value
+                              .canMoveToColumn(move.cardValues, i);
                         },
                         onCardMovedHere: (move) {
                           if (move.fromGroupValue is! int) return;
@@ -582,4 +615,3 @@ class SpiderSolitaire extends HookConsumerWidget {
     );
   }
 }
-

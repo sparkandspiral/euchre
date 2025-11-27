@@ -8,6 +8,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
+import 'package:solitaire/model/immutable_history.dart';
 import 'package:solitaire/services/achievement_service.dart';
 import 'package:solitaire/services/audio_service.dart';
 import 'package:solitaire/styles/playing_card_asset_bundle_cache.dart';
@@ -58,7 +59,7 @@ class FreeCellState {
 
   final bool usedUndo;
   final bool canAutoMove;
-  final List<FreeCellState> history;
+  final ImmutableHistory<FreeCellState> history;
 
   FreeCellState({
     required this.tableauCards,
@@ -69,10 +70,12 @@ class FreeCellState {
     required this.history,
   });
 
-  static FreeCellState getInitialState({required int freeCellCount, required bool acesAtBottom}) {
+  static FreeCellState getInitialState(
+      {required int freeCellCount, required bool acesAtBottom}) {
     var deck = SuitedCard.deck.shuffled();
 
-    final aces = deck.where((card) => card.value == AceSuitedCardValue()).toList();
+    final aces =
+        deck.where((card) => card.value == AceSuitedCardValue()).toList();
     if (acesAtBottom) {
       deck = deck.where((card) => card.value != AceSuitedCardValue()).toList();
     }
@@ -94,14 +97,16 @@ class FreeCellState {
     return FreeCellState(
       tableauCards: tableauCards,
       freeCells: List.filled(freeCellCount, null),
-      foundationCards: Map.fromEntries(CardSuit.values.map((suit) => MapEntry(suit, []))),
+      foundationCards:
+          Map.fromEntries(CardSuit.values.map((suit) => MapEntry(suit, []))),
       usedUndo: false,
-      history: [],
+      history: const ImmutableHistory.empty(),
       canAutoMove: true,
     );
   }
 
-  int getCardValue(SuitedCard card) => SuitedCardValueMapper.aceAsLowest.getValue(card);
+  int getCardValue(SuitedCard card) =>
+      SuitedCardValueMapper.aceAsLowest.getValue(card);
 
   int get maxMoveSize {
     final emptyCells = freeCells.where((cell) => cell == null).length;
@@ -112,18 +117,22 @@ class FreeCellState {
 
   int getMaxMoveSizeForTarget(int targetColumn) {
     final emptyCells = freeCells.where((cell) => cell == null).length;
-    final emptyTableauxCount = tableauCards.where((column) => column.isEmpty).length;
+    final emptyTableauxCount =
+        tableauCards.where((column) => column.isEmpty).length;
 
-    final effectiveEmptyTableauxCount =
-        tableauCards[targetColumn].isEmpty ? max(0, emptyTableauxCount - 1) : emptyTableauxCount;
+    final effectiveEmptyTableauxCount = tableauCards[targetColumn].isEmpty
+        ? max(0, emptyTableauxCount - 1)
+        : emptyTableauxCount;
 
     return (emptyCells + 1) * pow(2, effectiveEmptyTableauxCount).toInt();
   }
 
   bool canAddToFoundation(SuitedCard card) {
     final foundationSuitCards = foundationCards[card.suit]!;
-    return (foundationSuitCards.isEmpty && card.value == AceSuitedCardValue()) ||
-        (foundationSuitCards.isNotEmpty && getCardValue(foundationSuitCards.last) + 1 == getCardValue(card));
+    return (foundationSuitCards.isEmpty &&
+            card.value == AceSuitedCardValue()) ||
+        (foundationSuitCards.isNotEmpty &&
+            getCardValue(foundationSuitCards.last) + 1 == getCardValue(card));
   }
 
   bool isValidSequence(List<SuitedCard> cards) {
@@ -133,7 +142,8 @@ class FreeCellState {
       final currentCard = cards[i];
       final nextCard = cards[i + 1];
 
-      if (currentCard.suit.color == nextCard.suit.color || getCardValue(currentCard) != getCardValue(nextCard) + 1) {
+      if (currentCard.suit.color == nextCard.suit.color ||
+          getCardValue(currentCard) != getCardValue(nextCard) + 1) {
         return false;
       }
     }
@@ -161,17 +171,19 @@ class FreeCellState {
     }
   }
 
-  bool canMoveToFreeCell(SuitedCard card, int cellIndex) => freeCells[cellIndex] == null;
+  bool canMoveToFreeCell(SuitedCard card, int cellIndex) =>
+      freeCells[cellIndex] == null;
 
-  FreeCellState withMoveFromTableauToTableau(List<SuitedCard> cards, int fromColumn, int toColumn) {
+  FreeCellState withMoveFromTableauToTableau(
+      List<SuitedCard> cards, int fromColumn, int toColumn) {
     if (!canMoveToTableau(cards, toColumn)) {
       return this;
     }
 
     final newTableauCards = [...tableauCards];
 
-    newTableauCards[fromColumn] =
-        newTableauCards[fromColumn].sublist(0, newTableauCards[fromColumn].length - cards.length);
+    newTableauCards[fromColumn] = newTableauCards[fromColumn]
+        .sublist(0, newTableauCards[fromColumn].length - cards.length);
 
     newTableauCards[toColumn] = [...newTableauCards[toColumn], ...cards];
 
@@ -272,7 +284,8 @@ class FreeCellState {
     );
   }
 
-  FreeCellState withMoveFromFreeCellToFreeCell(int fromCellIndex, int toCellIndex) {
+  FreeCellState withMoveFromFreeCellToFreeCell(
+      int fromCellIndex, int toCellIndex) {
     final card = freeCells[fromCellIndex];
 
     if (card == null || freeCells[toCellIndex] != null) {
@@ -317,21 +330,26 @@ class FreeCellState {
     );
   }
 
-  FreeCellState withMove(List<SuitedCard> cards, GroupValue fromValue, GroupValue toValue) {
+  FreeCellState withMove(
+      List<SuitedCard> cards, GroupValue fromValue, GroupValue toValue) {
     if (fromValue is TableauGroupValue && toValue is TableauGroupValue) {
-      return withMoveFromTableauToTableau(cards, fromValue.columnIndex, toValue.columnIndex);
+      return withMoveFromTableauToTableau(
+          cards, fromValue.columnIndex, toValue.columnIndex);
     }
 
     if (fromValue is TableauGroupValue && toValue is FreeCellGroupValue) {
-      return withMoveFromTableauToFreeCell(fromValue.columnIndex, toValue.cellIndex);
+      return withMoveFromTableauToFreeCell(
+          fromValue.columnIndex, toValue.cellIndex);
     }
 
     if (fromValue is FreeCellGroupValue && toValue is TableauGroupValue) {
-      return withMoveFromFreeCellToTableau(fromValue.cellIndex, toValue.columnIndex);
+      return withMoveFromFreeCellToTableau(
+          fromValue.cellIndex, toValue.columnIndex);
     }
 
     if (fromValue is FreeCellGroupValue && toValue is FreeCellGroupValue) {
-      return withMoveFromFreeCellToFreeCell(fromValue.cellIndex, toValue.cellIndex);
+      return withMoveFromFreeCellToFreeCell(
+          fromValue.cellIndex, toValue.cellIndex);
     }
 
     if (fromValue is TableauGroupValue && toValue is FoundationGroupValue) {
@@ -343,7 +361,8 @@ class FreeCellState {
     }
 
     if (fromValue is FoundationGroupValue && toValue is TableauGroupValue) {
-      return withMoveFromFoundationToTableau(fromValue.suit, toValue.columnIndex);
+      return withMoveFromFoundationToTableau(
+          fromValue.suit, toValue.columnIndex);
     }
 
     return this;
@@ -361,14 +380,16 @@ class FreeCellState {
         return null;
       }
 
-      if (cardIndexInTableau != null && cardIndexInTableau < column.length - 1) {
+      if (cardIndexInTableau != null &&
+          cardIndexInTableau < column.length - 1) {
         final subsequence = column.sublist(cardIndexInTableau);
         if (isValidSequence(subsequence) && subsequence.length <= maxMoveSize) {
           List<int> validNonEmptyColumns = [];
           List<int> validEmptyColumns = [];
 
           for (int i = 0; i < tableauCards.length; i++) {
-            if (i != tableauGroup.columnIndex && canMoveToTableau(subsequence, i)) {
+            if (i != tableauGroup.columnIndex &&
+                canMoveToTableau(subsequence, i)) {
               if (tableauCards[i].isEmpty) {
                 validEmptyColumns.add(i);
               } else {
@@ -378,9 +399,11 @@ class FreeCellState {
           }
 
           if (validNonEmptyColumns.isNotEmpty) {
-            return withMoveFromTableauToTableau(subsequence, tableauGroup.columnIndex, validNonEmptyColumns.first);
+            return withMoveFromTableauToTableau(subsequence,
+                tableauGroup.columnIndex, validNonEmptyColumns.first);
           } else if (validEmptyColumns.isNotEmpty) {
-            return withMoveFromTableauToTableau(subsequence, tableauGroup.columnIndex, validEmptyColumns.first);
+            return withMoveFromTableauToTableau(
+                subsequence, tableauGroup.columnIndex, validEmptyColumns.first);
           }
         }
         return null;
@@ -406,9 +429,11 @@ class FreeCellState {
       }
 
       if (validNonEmptyColumns.isNotEmpty) {
-        return withMoveFromTableauToTableau([card], tableauGroup.columnIndex, validNonEmptyColumns.first);
+        return withMoveFromTableauToTableau(
+            [card], tableauGroup.columnIndex, validNonEmptyColumns.first);
       } else if (validEmptyColumns.isNotEmpty) {
-        return withMoveFromTableauToTableau([card], tableauGroup.columnIndex, validEmptyColumns.first);
+        return withMoveFromTableauToTableau(
+            [card], tableauGroup.columnIndex, validEmptyColumns.first);
       }
 
       for (int i = 0; i < freeCells.length; i++) {
@@ -440,9 +465,11 @@ class FreeCellState {
       }
 
       if (validNonEmptyColumns.isNotEmpty) {
-        return withMoveFromFreeCellToTableau(freeCellGroup.cellIndex, validNonEmptyColumns.first);
+        return withMoveFromFreeCellToTableau(
+            freeCellGroup.cellIndex, validNonEmptyColumns.first);
       } else if (validEmptyColumns.isNotEmpty) {
-        return withMoveFromFreeCellToTableau(freeCellGroup.cellIndex, validEmptyColumns.first);
+        return withMoveFromFreeCellToTableau(
+            freeCellGroup.cellIndex, validEmptyColumns.first);
       }
     } else if (foundationGroup != null) {
       final foundationPile = foundationCards[foundationGroup.suit]!;
@@ -458,13 +485,15 @@ class FreeCellState {
         }
       }
     } else {
-      final lowestFoundationValue =
-          foundationCards.values.map((cards) => cards.isEmpty ? 0 : getCardValue(cards.last)).reduce(min);
+      final lowestFoundationValue = foundationCards.values
+          .map((cards) => cards.isEmpty ? 0 : getCardValue(cards.last))
+          .reduce(min);
 
       final safeAutoMoveThreshold = lowestFoundationValue + 2;
 
       bool isSafeToAutoMove(SuitedCard card) {
-        return canAddToFoundation(card) && getCardValue(card) <= safeAutoMoveThreshold;
+        return canAddToFoundation(card) &&
+            getCardValue(card) <= safeAutoMoveThreshold;
       }
 
       for (int i = 0; i < tableauCards.length; i++) {
@@ -488,10 +517,12 @@ class FreeCellState {
   }
 
   FreeCellState withUndo() {
-    return history.last.copyWith(canAutoMove: false, saveNewStateToHistory: false, usedUndo: true);
+    return history.last.copyWith(
+        canAutoMove: false, saveNewStateToHistory: false, usedUndo: true);
   }
 
-  bool get isVictory => foundationCards.values.every((cards) => cards.length == 13);
+  bool get isVictory =>
+      foundationCards.values.every((cards) => cards.length == 13);
 
   FreeCellState copyWith({
     List<List<SuitedCard>>? tableauCards,
@@ -501,13 +532,15 @@ class FreeCellState {
     bool? canAutoMove,
     bool saveNewStateToHistory = true,
   }) {
+    final nextHistory = saveNewStateToHistory ? history.push(this) : history;
+
     return FreeCellState(
       tableauCards: tableauCards ?? this.tableauCards,
       freeCells: freeCells ?? this.freeCells,
       foundationCards: foundationCards ?? this.foundationCards,
       usedUndo: usedUndo ?? this.usedUndo,
       canAutoMove: canAutoMove ?? this.canAutoMove,
-      history: history + [if (saveNewStateToHistory) this],
+      history: nextHistory,
     );
   }
 }
@@ -516,7 +549,8 @@ class FreeCell extends HookConsumerWidget {
   final Difficulty difficulty;
   final bool startWithTutorial;
 
-  const FreeCell({super.key, required this.difficulty, this.startWithTutorial = false});
+  const FreeCell(
+      {super.key, required this.difficulty, this.startWithTutorial = false});
 
   FreeCellState get initialState => FreeCellState.getInitialState(
         freeCellCount: switch (difficulty) {
@@ -532,7 +566,9 @@ class FreeCell extends HookConsumerWidget {
 
     useOnListenableChange(
       state,
-      () => ref.read(achievementServiceProvider).checkFreeCellMoveAchievements(state: state.value),
+      () => ref
+          .read(achievementServiceProvider)
+          .checkFreeCellMoveAchievements(state: state.value),
     );
 
     final tableauKey = useMemoized(() => GlobalKey());
@@ -568,7 +604,8 @@ class FreeCell extends HookConsumerWidget {
 
     useOneTimeEffect(() {
       if (startWithTutorial) {
-        Future.delayed(Duration(milliseconds: 200)).then((_) => startTutorial());
+        Future.delayed(Duration(milliseconds: 200))
+            .then((_) => startTutorial());
       }
       return null;
     });
@@ -577,13 +614,18 @@ class FreeCell extends HookConsumerWidget {
       game: Game.freeCell,
       difficulty: difficulty,
       onNewGame: () => state.value = initialState,
-      onRestart: () => state.value = (state.value.history.firstOrNull ?? state.value).copyWith(canAutoMove: true),
+      onRestart: () => state.value =
+          (state.value.history.firstOrNull ?? state.value)
+              .copyWith(canAutoMove: true),
       onTutorial: startTutorial,
-      onUndo: state.value.history.isEmpty ? null : () => state.value = state.value.withUndo(),
+      onUndo: state.value.history.isEmpty
+          ? null
+          : () => state.value = state.value.withUndo(),
       isVictory: state.value.isVictory,
       onVictory: () => ref
           .read(achievementServiceProvider)
-          .checkFreeCellCompletionAchievements(difficulty: difficulty, state: state.value),
+          .checkFreeCellCompletionAchievements(
+              difficulty: difficulty, state: state.value),
       builder: (context, constraints, cardBack, autoMoveEnabled, gameKey) {
         final axis = constraints.largestAxis;
         final minSize = constraints.smallest.longestSide;
@@ -600,7 +642,8 @@ class FreeCell extends HookConsumerWidget {
         return DelayedAutoMoveListener(
           enabled: autoMoveEnabled,
           stateGetter: () => state.value,
-          nextStateGetter: (state) => state.canAutoMove ? state.withAutoMove() : null,
+          nextStateGetter: (state) =>
+              state.canAutoMove ? state.withAutoMove() : null,
           gameKey: gameKey,
           onNewState: (newState) {
             ref.read(audioServiceProvider).playPlace();
@@ -613,8 +656,10 @@ class FreeCell extends HookConsumerWidget {
               cardBack: cardBack,
               emptyGroupOverlayBuilder: (group) => group is FoundationGroupValue
                   ? VectorGraphic(
-                      loader: PlayingCardAssetBundleCache.getSuitLoader(group.suit),
-                      colorFilter: ColorFilter.mode(Colors.white30, BlendMode.srcIn),
+                      loader:
+                          PlayingCardAssetBundleCache.getSuitLoader(group.suit),
+                      colorFilter:
+                          ColorFilter.mode(Colors.white30, BlendMode.srcIn),
                     )
                   : null,
             ),
@@ -631,27 +676,36 @@ class FreeCell extends HookConsumerWidget {
                           direction: axis,
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            ...state.value.freeCells.mapIndexed((i, card) => CardDeck<SuitedCard, GroupValue>(
+                            ...state.value.freeCells.mapIndexed((i, card) =>
+                                CardDeck<SuitedCard, GroupValue>(
                                   value: FreeCellGroupValue(i),
                                   values: card == null ? [] : [card],
                                   canGrab: true,
-                                  canMoveCardHere: (move) => move.cardValues.length == 1 && card == null,
+                                  canMoveCardHere: (move) =>
+                                      move.cardValues.length == 1 &&
+                                      card == null,
                                   onCardMovedHere: (move) {
                                     ref.read(audioServiceProvider).playPlace();
-                                    state.value = state.value
-                                        .withMove(move.cardValues, move.fromGroupValue, FreeCellGroupValue(i));
+                                    state.value = state.value.withMove(
+                                        move.cardValues,
+                                        move.fromGroupValue,
+                                        FreeCellGroupValue(i));
                                   },
                                   onCardPressed: (card) {
-                                    final newState = state.value.withAutoMove(freeCellGroup: FreeCellGroupValue(i));
+                                    final newState = state.value.withAutoMove(
+                                        freeCellGroup: FreeCellGroupValue(i));
                                     if (newState != null) {
-                                      ref.read(audioServiceProvider).playPlace();
+                                      ref
+                                          .read(audioServiceProvider)
+                                          .playPlace();
                                       state.value = newState;
                                     }
                                   },
                                 )),
                             ...List.filled(
                               4 - state.value.freeCells.length,
-                              SizedBox.fromSize(size: Size(69, 93) * sizeMultiplier),
+                              SizedBox.fromSize(
+                                  size: Size(69, 93) * sizeMultiplier),
                             ),
                           ],
                         ),
@@ -663,28 +717,40 @@ class FreeCell extends HookConsumerWidget {
                           direction: axis,
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: state.value.foundationCards.entries
-                              .map<Widget>((entry) => CardDeck<SuitedCard, GroupValue>(
-                                    value: FoundationGroupValue(entry.key),
-                                    values: entry.value,
-                                    canGrab: true,
-                                    canMoveCardHere: (move) =>
-                                        move.cardValues.length == 1 &&
-                                        canAddToFoundation(move.cardValues.first, entry.key, entry.value),
-                                    onCardMovedHere: (move) {
-                                      ref.read(audioServiceProvider).playPlace();
-                                      state.value = state.value.withMove(
-                                          move.cardValues, move.fromGroupValue, FoundationGroupValue(entry.key));
-                                    },
-                                    onCardPressed: (card) {
-                                      final newState = state.value.withAutoMove(
-                                        foundationGroup: FoundationGroupValue(entry.key),
-                                      );
-                                      if (newState != null) {
-                                        ref.read(audioServiceProvider).playPlace();
-                                        state.value = newState;
-                                      }
-                                    },
-                                  ))
+                              .map<Widget>(
+                                  (entry) => CardDeck<SuitedCard, GroupValue>(
+                                        value: FoundationGroupValue(entry.key),
+                                        values: entry.value,
+                                        canGrab: true,
+                                        canMoveCardHere: (move) =>
+                                            move.cardValues.length == 1 &&
+                                            canAddToFoundation(
+                                                move.cardValues.first,
+                                                entry.key,
+                                                entry.value),
+                                        onCardMovedHere: (move) {
+                                          ref
+                                              .read(audioServiceProvider)
+                                              .playPlace();
+                                          state.value = state.value.withMove(
+                                              move.cardValues,
+                                              move.fromGroupValue,
+                                              FoundationGroupValue(entry.key));
+                                        },
+                                        onCardPressed: (card) {
+                                          final newState =
+                                              state.value.withAutoMove(
+                                            foundationGroup:
+                                                FoundationGroupValue(entry.key),
+                                          );
+                                          if (newState != null) {
+                                            ref
+                                                .read(audioServiceProvider)
+                                                .playPlace();
+                                            state.value = newState;
+                                          }
+                                        },
+                                      ))
                               .toList(),
                         ),
                       ),
@@ -711,17 +777,21 @@ class FreeCell extends HookConsumerWidget {
                               final subsequence = columnCards.sublist(index);
                               return state.value.isValidSequence(subsequence);
                             },
-                            canMoveCardHere: (move) => state.value.canMoveToTableau(move.cardValues, i),
+                            canMoveCardHere: (move) => state.value
+                                .canMoveToTableau(move.cardValues, i),
                             onCardMovedHere: (move) {
                               ref.read(audioServiceProvider).playPlace();
-                              state.value =
-                                  state.value.withMove(move.cardValues, move.fromGroupValue, TableauGroupValue(i));
+                              state.value = state.value.withMove(
+                                  move.cardValues,
+                                  move.fromGroupValue,
+                                  TableauGroupValue(i));
                             },
                             onCardPressed: (card) {
                               final cardIndex = columnCards.indexOf(card);
 
-                              final newState = state.value
-                                  .withAutoMove(tableauGroup: TableauGroupValue(i), cardIndexInTableau: cardIndex);
+                              final newState = state.value.withAutoMove(
+                                  tableauGroup: TableauGroupValue(i),
+                                  cardIndexInTableau: cardIndex);
 
                               if (newState != null) {
                                 ref.read(audioServiceProvider).playPlace();
@@ -742,12 +812,16 @@ class FreeCell extends HookConsumerWidget {
     );
   }
 
-  static bool canAddToFoundation(SuitedCard card, CardSuit suit, List<SuitedCard> foundationPile) {
+  static bool canAddToFoundation(
+      SuitedCard card, CardSuit suit, List<SuitedCard> foundationPile) {
     if (card.suit != suit) return false;
 
     final cardValue = SuitedCardValueMapper.aceAsLowest.getValue(card);
 
     return foundationPile.isEmpty && card.value == AceSuitedCardValue() ||
-        (foundationPile.isNotEmpty && SuitedCardValueMapper.aceAsLowest.getValue(foundationPile.last) + 1 == cardValue);
+        (foundationPile.isNotEmpty &&
+            SuitedCardValueMapper.aceAsLowest.getValue(foundationPile.last) +
+                    1 ==
+                cardValue);
   }
 }

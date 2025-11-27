@@ -6,6 +6,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:equatable/equatable.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
+import 'package:solitaire/model/immutable_history.dart';
 import 'package:solitaire/services/audio_service.dart';
 import 'package:solitaire/styles/playing_card_builder.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
@@ -32,12 +33,13 @@ class PyramidCard extends Equatable {
 class PyramidSolitaireState {
   // 7 rows; row i has i+1 cards. Hidden shows covered cards beneath.
   final List<List<PyramidCard>> pyramid;
-  final List<List<bool>> hidden; // true means face-down (covered), false means revealed
+  final List<List<bool>>
+      hidden; // true means face-down (covered), false means revealed
 
   final List<PyramidCard> stock; // draw pile
   final List<PyramidCard> waste; // exposed from stock (top playable)
 
-  final List<PyramidSolitaireState> history;
+  final ImmutableHistory<PyramidSolitaireState> history;
   final bool usedUndo;
   final PyramidCardPos? selected;
 
@@ -60,8 +62,11 @@ class PyramidSolitaireState {
 
     // Optionally bury Aces at bottom of stock to increase difficulty similar to Ace mode patterns
     if (buryAces) {
-      final aces = suitedDeck.where((c) => c.value == AceSuitedCardValue()).toList();
-      suitedDeck = suitedDeck.where((c) => c.value != AceSuitedCardValue()).toList() + aces;
+      final aces =
+          suitedDeck.where((c) => c.value == AceSuitedCardValue()).toList();
+      suitedDeck =
+          suitedDeck.where((c) => c.value != AceSuitedCardValue()).toList() +
+              aces;
     }
 
     // Wrap in unique PyramidCard instances
@@ -95,7 +100,7 @@ class PyramidSolitaireState {
       hidden: hidden,
       stock: deck,
       waste: waste,
-      history: [],
+      history: const ImmutableHistory.empty(),
       usedUndo: false,
       selected: null,
     );
@@ -107,7 +112,8 @@ class PyramidSolitaireState {
     return true;
   }
 
-  int _value(PyramidCard card) => SuitedCardValueMapper.aceAsLowest.getValue(card.card);
+  int _value(PyramidCard card) =>
+      SuitedCardValueMapper.aceAsLowest.getValue(card.card);
 
   bool isExposed(int row, int col) {
     if (!_hasCard(pyramid, row, col)) return false;
@@ -124,15 +130,18 @@ class PyramidSolitaireState {
     return positions;
   }
 
-  bool canRemovePair(PyramidCard a, PyramidCard b) => _value(a) + _value(b) == 13;
+  bool canRemovePair(PyramidCard a, PyramidCard b) =>
+      _value(a) + _value(b) == 13;
   bool canRemoveKing(PyramidCard a) => _value(a) == 13;
 
-  PyramidSolitaireState _revealIfUncovered(PyramidSolitaireState state, int row, int col) {
+  PyramidSolitaireState _revealIfUncovered(
+      PyramidSolitaireState state, int row, int col) {
     // After removing a card at row+1, col or col+1, the covering card at row,col may become exposed
     if (!_hasCard(state.pyramid, row, col)) return state;
     if (!state.hidden[row][col]) return state;
 
-    final covered = _hasCard(state.pyramid, row + 1, col) && _hasCard(state.pyramid, row + 1, col + 1);
+    final covered = _hasCard(state.pyramid, row + 1, col) &&
+        _hasCard(state.pyramid, row + 1, col + 1);
     if (!covered) {
       final newHiddenRow = [...state.hidden[row]];
       newHiddenRow[col] = false;
@@ -148,10 +157,16 @@ class PyramidSolitaireState {
     final card = pyramid[row][col];
     if (!canRemoveKing(card)) return this;
 
-    final newPyramid = pyramid.mapIndexed((r, list) =>
-        r == row ? (list.sublist(0, col) + list.sublist(col + 1)) : [...list]).toList();
-    final newHidden = hidden.mapIndexed((r, list) =>
-        r == row ? (list.sublist(0, col) + list.sublist(col + 1)) : [...list]).toList();
+    final newPyramid = pyramid
+        .mapIndexed((r, list) => r == row
+            ? (list.sublist(0, col) + list.sublist(col + 1))
+            : [...list])
+        .toList();
+    final newHidden = hidden
+        .mapIndexed((r, list) => r == row
+            ? (list.sublist(0, col) + list.sublist(col + 1))
+            : [...list])
+        .toList();
 
     var newState = copyWith(pyramid: newPyramid, hidden: newHidden);
     // Reveal parent cards
@@ -162,20 +177,24 @@ class PyramidSolitaireState {
     return newState.copyWith(selected: null);
   }
 
-  PyramidSolitaireState withRemovePairFromPyramid(PyramidCardPos a, PyramidCardPos b) {
+  PyramidSolitaireState withRemovePairFromPyramid(
+      PyramidCardPos a, PyramidCardPos b) {
     if (!isExposed(a.row, a.col) || !isExposed(b.row, b.col)) return this;
     final cardA = pyramid[a.row][a.col];
     final cardB = pyramid[b.row][b.col];
     if (!canRemovePair(cardA, cardB)) return this;
 
-    final remove = (List<PyramidCard> list, int i) => list.sublist(0, i) + list.sublist(i + 1);
-    final removeBool = (List<bool> list, int i) => list.sublist(0, i) + list.sublist(i + 1);
+    final remove = (List<PyramidCard> list, int i) =>
+        list.sublist(0, i) + list.sublist(i + 1);
+    final removeBool =
+        (List<bool> list, int i) => list.sublist(0, i) + list.sublist(i + 1);
 
     var newPyramid = [...pyramid];
     var newHidden = [...hidden];
 
     // Remove higher index first to avoid reindexing issues if same row
-    final pairs = [a, b]..sort((x, y) => x.row == y.row ? y.col.compareTo(x.col) : y.row.compareTo(x.row));
+    final pairs = [a, b]..sort((x, y) =>
+        x.row == y.row ? y.col.compareTo(x.col) : y.row.compareTo(x.row));
     for (final p in pairs) {
       newPyramid[p.row] = remove(newPyramid[p.row], p.col);
       newHidden[p.row] = removeBool(newHidden[p.row], p.col);
@@ -199,8 +218,10 @@ class PyramidSolitaireState {
     if (!canRemovePair(cardA, cardB)) return this;
 
     final newWaste = [...waste]..removeLast();
-    final newPyramidRow = pyramid[pos.row].sublist(0, pos.col) + pyramid[pos.row].sublist(pos.col + 1);
-    final newHiddenRow = hidden[pos.row].sublist(0, pos.col) + hidden[pos.row].sublist(pos.col + 1);
+    final newPyramidRow = pyramid[pos.row].sublist(0, pos.col) +
+        pyramid[pos.row].sublist(pos.col + 1);
+    final newHiddenRow = hidden[pos.row].sublist(0, pos.col) +
+        hidden[pos.row].sublist(pos.col + 1);
 
     var newState = copyWith(
       pyramid: [...pyramid]..[pos.row] = newPyramidRow,
@@ -218,10 +239,12 @@ class PyramidSolitaireState {
 
   PyramidSolitaireState withDraw() {
     if (stock.isEmpty) return this;
-    return copyWith(stock: stock.sublist(0, stock.length - 1), waste: waste + [stock.last]);
+    return copyWith(
+        stock: stock.sublist(0, stock.length - 1), waste: waste + [stock.last]);
   }
 
-  PyramidSolitaireState withUndo() => history.last.copyWith(saveNewStateToHistory: false, usedUndo: true);
+  PyramidSolitaireState withUndo() =>
+      history.last.copyWith(saveNewStateToHistory: false, usedUndo: true);
 
   bool get isVictory => pyramid.every((row) => row.isEmpty);
 
@@ -235,6 +258,8 @@ class PyramidSolitaireState {
     bool clearSelected = false,
     bool saveNewStateToHistory = true,
   }) {
+    final nextHistory = saveNewStateToHistory ? history.push(this) : history;
+
     return PyramidSolitaireState(
       pyramid: pyramid ?? this.pyramid,
       hidden: hidden ?? this.hidden,
@@ -242,7 +267,7 @@ class PyramidSolitaireState {
       waste: waste ?? this.waste,
       usedUndo: usedUndo ?? this.usedUndo,
       selected: clearSelected ? null : (selected ?? this.selected),
-      history: history + [if (saveNewStateToHistory) this],
+      history: nextHistory,
     );
   }
 }
@@ -251,11 +276,13 @@ class PyramidSolitaire extends HookConsumerWidget {
   final Difficulty difficulty;
   final bool startWithTutorial;
 
-  const PyramidSolitaire({super.key, required this.difficulty, this.startWithTutorial = false});
+  const PyramidSolitaire(
+      {super.key, required this.difficulty, this.startWithTutorial = false});
 
   int get drawPerTap => 1; // standard pyramid draws 1 to waste
 
-  PyramidSolitaireState get initialState => PyramidSolitaireState.getInitialState(
+  PyramidSolitaireState get initialState =>
+      PyramidSolitaireState.getInitialState(
         drawPerTap: drawPerTap,
         buryAces: difficulty == Difficulty.ace,
         startWithWasteCard: difficulty.index >= Difficulty.royal.index,
@@ -285,7 +312,8 @@ class PyramidSolitaire extends HookConsumerWidget {
           ),
           TutorialScreen.key(
             key: stockKey,
-            message: 'Tap the stock to draw a new waste card when you need options.',
+            message:
+                'Tap the stock to draw a new waste card when you need options.',
           ),
           TutorialScreen.everything(
             message: 'Clear the entire pyramid to win. Tap to begin playing!',
@@ -296,7 +324,8 @@ class PyramidSolitaire extends HookConsumerWidget {
 
     useOneTimeEffect(() {
       if (startWithTutorial) {
-        Future.delayed(Duration(milliseconds: 200)).then((_) => startTutorial());
+        Future.delayed(Duration(milliseconds: 200))
+            .then((_) => startTutorial());
       }
       return null;
     });
@@ -305,10 +334,13 @@ class PyramidSolitaire extends HookConsumerWidget {
       game: Game.pyramid,
       difficulty: difficulty,
       onNewGame: () => state.value = initialState,
-      onRestart: () => state.value = (state.value.history.firstOrNull ?? state.value)
-          .copyWith(usedUndo: false),
+      onRestart: () => state.value =
+          (state.value.history.firstOrNull ?? state.value)
+              .copyWith(usedUndo: false),
       onTutorial: startTutorial,
-      onUndo: state.value.history.isEmpty ? null : () => state.value = state.value.withUndo(),
+      onUndo: state.value.history.isEmpty
+          ? null
+          : () => state.value = state.value.withUndo(),
       isVictory: state.value.isVictory,
       // No per-game achievement checks for Pyramid currently; global checks handled by CardScaffold
       builder: (context, constraints, cardBack, autoMoveEnabled, gameKey) {
@@ -316,7 +348,9 @@ class PyramidSolitaire extends HookConsumerWidget {
         final minSize = constraints.smallest.longestSide;
         final spacing = minSize / 100;
 
-        final maxRows = axis == Axis.horizontal ? 4.0 : 10.0; // allow a bit more headroom in portrait
+        final maxRows = axis == Axis.horizontal
+            ? 4.0
+            : 10.0; // allow a bit more headroom in portrait
         final maxCols = axis == Axis.horizontal ? 9.0 : 7.0;
 
         final sizeMultiplier = constraints.findCardSizeMultiplier(
@@ -324,8 +358,6 @@ class PyramidSolitaire extends HookConsumerWidget {
           maxCols: maxCols,
           spacing: spacing,
         );
-
-        
 
         Widget buildPyramid() {
           final cardWidth = 69 * sizeMultiplier;
@@ -336,24 +368,27 @@ class PyramidSolitaire extends HookConsumerWidget {
             spacing: spacing,
             children: List.generate(state.value.pyramid.length, (r) {
               final rowCards = state.value.pyramid[r];
-              
+
               return Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 spacing: spacing,
                 children: List.generate(rowCards.length, (c) {
-                  final isSelected = state.value.selected?.row == r && state.value.selected?.col == c;
-                  
+                  final isSelected = state.value.selected?.row == r &&
+                      state.value.selected?.col == c;
+
                   return Container(
-                    decoration: isSelected ? BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.yellow.withOpacity(0.8),
-                          blurRadius: 20,
-                          spreadRadius: 4,
-                        ),
-                      ],
-                    ) : null,
+                    decoration: isSelected
+                        ? BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.yellow.withOpacity(0.8),
+                                blurRadius: 20,
+                                spreadRadius: 4,
+                              ),
+                            ],
+                          )
+                        : null,
                     child: SizedBox(
                       width: cardWidth,
                       height: 93 * sizeMultiplier,
@@ -364,17 +399,18 @@ class PyramidSolitaire extends HookConsumerWidget {
             }),
           );
         }
-        
+
         Widget buildPyramidCards() {
           final cardWidth = 69 * sizeMultiplier;
           final cardHeight = 93 * sizeMultiplier;
-          
+
           return Stack(
             children: List.generate(state.value.pyramid.length, (r) {
               final rowCards = state.value.pyramid[r];
               final rowHidden = state.value.hidden[r];
-              final rowWidth = (cardWidth * rowCards.length) + (spacing * (rowCards.length - 1));
-              
+              final rowWidth = (cardWidth * rowCards.length) +
+                  (spacing * (rowCards.length - 1));
+
               return Positioned(
                 top: r * (cardHeight + spacing),
                 left: 0,
@@ -400,21 +436,26 @@ class PyramidSolitaire extends HookConsumerWidget {
                           return;
                         }
                         if (state.value.waste.isNotEmpty &&
-                            state.value.canRemovePair(pressedCard, state.value.waste.last)) {
+                            state.value.canRemovePair(
+                                pressedCard, state.value.waste.last)) {
                           ref.read(audioServiceProvider).playPlace();
-                          state.value = state.value.withRemoveWithWaste(PyramidCardPos(r, c));
+                          state.value = state.value
+                              .withRemoveWithWaste(PyramidCardPos(r, c));
                           return;
                         }
                         final selected = state.value.selected;
                         if (selected == null) {
-                          state.value = state.value.copyWith(selected: PyramidCardPos(r, c));
+                          state.value = state.value
+                              .copyWith(selected: PyramidCardPos(r, c));
                           return;
                         }
                         if (selected.row == r && selected.col == c) {
-                          state.value = state.value.copyWith(clearSelected: true);
+                          state.value =
+                              state.value.copyWith(clearSelected: true);
                           return;
                         }
-                        final other = state.value.pyramid[selected.row][selected.col];
+                        final other =
+                            state.value.pyramid[selected.row][selected.col];
                         if (state.value.canRemovePair(pressedCard, other)) {
                           ref.read(audioServiceProvider).playPlace();
                           state.value = state.value.withRemovePairFromPyramid(
@@ -423,7 +464,8 @@ class PyramidSolitaire extends HookConsumerWidget {
                           );
                           return;
                         }
-                        state.value = state.value.copyWith(selected: PyramidCardPos(r, c));
+                        state.value = state.value
+                            .copyWith(selected: PyramidCardPos(r, c));
                       },
                       canMoveCardHere: (_) => false,
                     ),
@@ -439,7 +481,8 @@ class PyramidSolitaire extends HookConsumerWidget {
           style: CardGameStyle<PyramidCard, dynamic>(
             cardSize: Size(69, 93) * sizeMultiplier,
             emptyGroupBuilder: (group, state) => const SizedBox.shrink(),
-            cardBuilder: (value, group, flipped, cardState) => AnimatedFlippable(
+            cardBuilder: (value, group, flipped, cardState) =>
+                AnimatedFlippable(
               duration: Duration(milliseconds: 300),
               curve: Curves.easeInOutCubic,
               isFlipped: flipped,
@@ -494,7 +537,9 @@ class PyramidSolitaire extends HookConsumerWidget {
                     CardDeck<PyramidCard, dynamic>(
                       key: wasteKey,
                       value: 'waste',
-                      values: state.value.waste.isEmpty ? const [] : [state.value.waste.last],
+                      values: state.value.waste.isEmpty
+                          ? const []
+                          : [state.value.waste.last],
                       canGrab: false,
                       onCardPressed: (top) {
                         if (state.value.waste.isEmpty) return;
@@ -502,16 +547,21 @@ class PyramidSolitaire extends HookConsumerWidget {
                         // Remove King in waste
                         if (state.value.canRemoveKing(topCard)) {
                           ref.read(audioServiceProvider).playPlace();
-                          state.value = state.value.copyWith(waste: state.value.waste.sublist(0, state.value.waste.length - 1), clearSelected: true);
+                          state.value = state.value.copyWith(
+                              waste: state.value.waste
+                                  .sublist(0, state.value.waste.length - 1),
+                              clearSelected: true);
                           return;
                         }
                         // Try pair with selected pyramid card
                         final selected = state.value.selected;
                         if (selected != null) {
-                          final other = state.value.pyramid[selected.row][selected.col];
+                          final other =
+                              state.value.pyramid[selected.row][selected.col];
                           if (state.value.canRemovePair(topCard, other)) {
                             ref.read(audioServiceProvider).playPlace();
-                            state.value = state.value.withRemoveWithWaste(PyramidCardPos(selected.row, selected.col));
+                            state.value = state.value.withRemoveWithWaste(
+                                PyramidCardPos(selected.row, selected.col));
                           }
                         }
                       },
@@ -526,5 +576,3 @@ class PyramidSolitaire extends HookConsumerWidget {
     );
   }
 }
-
-

@@ -7,6 +7,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
+import 'package:solitaire/model/immutable_history.dart';
 import 'package:solitaire/services/achievement_service.dart';
 import 'package:solitaire/services/audio_service.dart';
 import 'package:solitaire/styles/playing_card_style.dart';
@@ -24,7 +25,7 @@ class TriPeaksSolitaireState {
   final int longestStreak;
   final bool canRollover;
 
-  final List<TriPeaksSolitaireState> history;
+  final ImmutableHistory<TriPeaksSolitaireState> history;
 
   TriPeaksSolitaireState({
     required this.tableau,
@@ -81,7 +82,7 @@ class TriPeaksSolitaireState {
       streak: 0,
       longestStreak: 0,
       canRollover: canRollover,
-      history: [],
+      history: const ImmutableHistory.empty(),
     );
   }
 
@@ -148,7 +149,7 @@ class TriPeaksSolitaireState {
       streak: newStreak,
       longestStreak: newStreak > longestStreak ? newStreak : longestStreak,
       canRollover: canRollover,
-      history: history + [this],
+      history: history.push(this),
     );
   }
 
@@ -161,7 +162,7 @@ class TriPeaksSolitaireState {
         streak: 0,
         longestStreak: longestStreak,
         canRollover: canRollover,
-        history: history + [this],
+        history: history.push(this),
       );
 
   TriPeaksSolitaireState withUndo() => history.last;

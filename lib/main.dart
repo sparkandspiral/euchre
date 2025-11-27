@@ -2,14 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:solitaire/home_page.dart';
 import 'package:solitaire/licenses.dart';
+import 'package:solitaire/profile/history_stress.dart';
 import 'package:solitaire/styles/playing_card_asset_bundle_cache.dart';
 
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey();
+
+const bool _useHistoryStressHarness =
+    bool.fromEnvironment('PROFILE_HISTORY_STRESS');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await registerExtraLicenses();
   await PlayingCardAssetBundleCache.preloadAssets();
+
+  if (_useHistoryStressHarness) {
+    runHistoryStressHarness();
+    return;
+  }
 
   runApp(ProviderScope(
     child: MaterialApp(

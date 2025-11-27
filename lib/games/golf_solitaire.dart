@@ -5,6 +5,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
+import 'package:solitaire/model/immutable_history.dart';
 import 'package:solitaire/services/achievement_service.dart';
 import 'package:solitaire/services/audio_service.dart';
 import 'package:solitaire/styles/playing_card_style.dart';
@@ -22,7 +23,7 @@ class GolfSolitaireState {
 
   final bool canRollover;
 
-  final List<GolfSolitaireState> history;
+  final ImmutableHistory<GolfSolitaireState> history;
 
   GolfSolitaireState({
     required this.cards,
@@ -33,7 +34,8 @@ class GolfSolitaireState {
     required this.history,
   });
 
-  static GolfSolitaireState getInitialState({required bool startWithDraw, required bool canRollover}) {
+  static GolfSolitaireState getInitialState(
+      {required bool startWithDraw, required bool canRollover}) {
     var deck = SuitedCard.deck.shuffled();
 
     final cards = List.generate(7, (i) {
@@ -54,15 +56,17 @@ class GolfSolitaireState {
       completedCards: completedCards,
       chain: 0,
       canRollover: canRollover,
-      history: [],
+      history: const ImmutableHistory.empty(),
     );
   }
 
-  SuitedCardDistanceMapper get distanceMapper =>
-      canRollover ? SuitedCardDistanceMapper.rollover : SuitedCardDistanceMapper.aceToKing;
+  SuitedCardDistanceMapper get distanceMapper => canRollover
+      ? SuitedCardDistanceMapper.rollover
+      : SuitedCardDistanceMapper.aceToKing;
 
   bool canSelect(SuitedCard card) =>
-      completedCards.isEmpty || distanceMapper.getDistance(completedCards.last, card) == 1;
+      completedCards.isEmpty ||
+      distanceMapper.getDistance(completedCards.last, card) == 1;
 
   GolfSolitaireState withSelection(SuitedCard card) => GolfSolitaireState(
         cards: cards.map((column) => [...column]..remove(card)).toList(),
@@ -70,7 +74,7 @@ class GolfSolitaireState {
         completedCards: completedCards + [card],
         chain: chain + 1,
         canRollover: canRollover,
-        history: history + [this],
+        history: history.push(this),
       );
 
   bool get canDraw => deck.isNotEmpty;
@@ -81,7 +85,7 @@ class GolfSolitaireState {
         completedCards: completedCards + [deck.last],
         chain: 0,
         canRollover: canRollover,
-        history: history + [this],
+        history: history.push(this),
       );
 
   GolfSolitaireState withUndo() => history.last;
@@ -109,7 +113,9 @@ class GolfSolitaire extends HookConsumerWidget {
     final state = useState(initialState);
     useOnListenableChange(
       state,
-      () => ref.read(achievementServiceProvider).checkGolfSolitaireMoveAchievements(state: state.value),
+      () => ref
+          .read(achievementServiceProvider)
+          .checkGolfSolitaireMoveAchievements(state: state.value),
     );
 
     final tableauKey = useMemoized(() => GlobalKey());
@@ -122,7 +128,8 @@ class GolfSolitaire extends HookConsumerWidget {
         screens: [
           TutorialScreen.key(
             key: tableauKey,
-            message: 'Welcome to Golf Solitaire! Your goal is to clear all the cards from the tableau.',
+            message:
+                'Welcome to Golf Solitaire! Your goal is to clear all the cards from the tableau.',
           ),
           TutorialScreen.key(
             key: foundationKey,
@@ -143,7 +150,8 @@ class GolfSolitaire extends HookConsumerWidget {
 
     useOneTimeEffect(() {
       if (startWithTutorial) {
-        Future.delayed(Duration(milliseconds: 200)).then((_) => startTutorial());
+        Future.delayed(Duration(milliseconds: 200))
+            .then((_) => startTutorial());
       }
       return null;
     });
@@ -152,13 +160,17 @@ class GolfSolitaire extends HookConsumerWidget {
       game: Game.golf,
       difficulty: difficulty,
       onNewGame: () => state.value = initialState,
-      onRestart: () => state.value = state.value.history.firstOrNull ?? state.value,
-      onUndo: state.value.history.isEmpty ? null : () => state.value = state.value.withUndo(),
+      onRestart: () =>
+          state.value = state.value.history.firstOrNull ?? state.value,
+      onUndo: state.value.history.isEmpty
+          ? null
+          : () => state.value = state.value.withUndo(),
       isVictory: state.value.isVictory,
       onTutorial: startTutorial,
       onVictory: () => ref
           .read(achievementServiceProvider)
-          .checkGolfSolitaireCompletionAchievements(state: state.value, difficulty: difficulty),
+          .checkGolfSolitaireCompletionAchievements(
+              state: state.value, difficulty: difficulty),
       builder: (context, constraints, cardBack, autoMoveEnabled, gameKey) {
         final axis = constraints.largestAxis;
         final minSize = constraints.smallest.longestSide;
@@ -174,7 +186,8 @@ class GolfSolitaire extends HookConsumerWidget {
 
         return CardGame<SuitedCard, dynamic>(
           gameKey: gameKey,
-          style: playingCardStyle(sizeMultiplier: sizeMultiplier, cardBack: cardBack),
+          style: playingCardStyle(
+              sizeMultiplier: sizeMultiplier, cardBack: cardBack),
           children: [
             Row(
               children: [
@@ -185,14 +198,16 @@ class GolfSolitaire extends HookConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: state.value.cards
-                        .mapIndexed((i, column) => CardLinearGroup<SuitedCard, dynamic>(
+                        .mapIndexed((i, column) =>
+                            CardLinearGroup<SuitedCard, dynamic>(
                               cardOffset: axis.inverted.offset * cardOffset,
                               value: i,
                               values: column,
                               canCardBeGrabbed: (_, __) => false,
                               maxGrabStackSize: 0,
                               onCardPressed: (card) {
-                                final lastCard = state.value.cards[i].lastOrNull;
+                                final lastCard =
+                                    state.value.cards[i].lastOrNull;
                                 if (lastCard != card) {
                                   return;
                                 }

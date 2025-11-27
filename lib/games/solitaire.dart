@@ -8,6 +8,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:solitaire/group/exposed_deck.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
+import 'package:solitaire/model/immutable_history.dart';
 import 'package:solitaire/services/achievement_service.dart';
 import 'package:solitaire/services/audio_service.dart';
 import 'package:solitaire/styles/playing_card_asset_bundle_cache.dart';
@@ -32,7 +33,7 @@ class SolitaireState {
   final bool usedUndo;
   final bool restartedDeck;
   final bool canAutoMove;
-  final List<SolitaireState> history;
+  final ImmutableHistory<SolitaireState> history;
 
   SolitaireState({
     this.drawAmount = 1,
@@ -47,10 +48,12 @@ class SolitaireState {
     required this.history,
   });
 
-  static SolitaireState getInitialState({required int drawAmount, required bool acesAtBottom}) {
+  static SolitaireState getInitialState(
+      {required int drawAmount, required bool acesAtBottom}) {
     var deck = SuitedCard.deck.shuffled();
 
-    final aces = deck.where((card) => card.value == AceSuitedCardValue()).toList();
+    final aces =
+        deck.where((card) => card.value == AceSuitedCardValue()).toList();
     if (acesAtBottom) {
       deck = deck.where((card) => card.value != AceSuitedCardValue()).toList();
     }
@@ -81,8 +84,9 @@ class SolitaireState {
       revealedCards: revealedCards,
       deck: deck,
       revealedDeck: [],
-      completedCards: Map.fromEntries(CardSuit.values.map((suit) => MapEntry(suit, []))),
-      history: [],
+      completedCards:
+          Map.fromEntries(CardSuit.values.map((suit) => MapEntry(suit, []))),
+      history: const ImmutableHistory.empty(),
       usedUndo: false,
       restartedDeck: false,
       canAutoMove: true,
@@ -100,14 +104,17 @@ class SolitaireState {
           )
         : copyWith(
             deck: deck.sublist(0, max(0, deck.length - drawAmount)),
-            revealedDeck: revealedDeck + deck.reversed.take(drawAmount).toList(),
+            revealedDeck:
+                revealedDeck + deck.reversed.take(drawAmount).toList(),
             canAutoMove: true,
           );
   }
 
-  int getCardValue(SuitedCard card) => SuitedCardValueMapper.aceAsLowest.getValue(card);
+  int getCardValue(SuitedCard card) =>
+      SuitedCardValueMapper.aceAsLowest.getValue(card);
 
-  SolitaireState withAutoTap(int column, List<SuitedCard> cards, {required Function() onSuccess}) {
+  SolitaireState withAutoTap(int column, List<SuitedCard> cards,
+      {required Function() onSuccess}) {
     if (cards.length == 1 && canComplete(cards.first)) {
       onSuccess();
       return withAttemptToComplete(column);
@@ -138,7 +145,8 @@ class SolitaireState {
     return withMoveFromDeck([card], newColumn);
   }
 
-  SolitaireState withAutoMoveFromCompleted(CardSuit suit, {required Function() onSuccess}) {
+  SolitaireState withAutoMoveFromCompleted(CardSuit suit,
+      {required Function() onSuccess}) {
     final card = completedCards[suit]!.last;
 
     final newColumn = List.generate(7, (i) => canMove([card], i)).indexOf(true);
@@ -153,7 +161,8 @@ class SolitaireState {
   bool canComplete(SuitedCard card) {
     final completedSuitCards = completedCards[card.suit]!;
     return completedSuitCards.isEmpty && card.value == AceSuitedCardValue() ||
-        (completedSuitCards.isNotEmpty && getCardValue(completedSuitCards.last) + 1 == getCardValue(card));
+        (completedSuitCards.isNotEmpty &&
+            getCardValue(completedSuitCards.last) + 1 == getCardValue(card));
   }
 
   SolitaireState withAttemptToComplete(int column) {
@@ -195,7 +204,10 @@ class SolitaireState {
         revealedDeck: [...revealedDeck]..removeLast(),
         completedCards: {
           ...completedCards,
-          revealedCard.suit: [...completedCards[revealedCard.suit]!, revealedCard],
+          revealedCard.suit: [
+            ...completedCards[revealedCard.suit]!,
+            revealedCard
+          ],
         },
         canAutoMove: true,
       );
@@ -208,13 +220,15 @@ class SolitaireState {
     final newColumnCard = revealedCards[newColumn].lastOrNull;
     final topMostCard = cards.first;
 
-    return (newColumnCard == null && topMostCard.value == KingSuitedCardValue()) ||
+    return (newColumnCard == null &&
+            topMostCard.value == KingSuitedCardValue()) ||
         (newColumnCard != null &&
             getCardValue(topMostCard) + 1 == getCardValue(newColumnCard) &&
             newColumnCard.suit.color != topMostCard.suit.color);
   }
 
-  SolitaireState withMove(List<SuitedCard> cards, dynamic oldColumn, int newColumn) {
+  SolitaireState withMove(
+      List<SuitedCard> cards, dynamic oldColumn, int newColumn) {
     return oldColumn == 'revealed-deck'
         ? withMoveFromDeck(cards, newColumn)
         : oldColumn is CardSuit
@@ -222,10 +236,11 @@ class SolitaireState {
             : withMoveFromColumn(cards, oldColumn, newColumn);
   }
 
-  SolitaireState withMoveFromColumn(List<SuitedCard> cards, int oldColumn, int newColumn) {
+  SolitaireState withMoveFromColumn(
+      List<SuitedCard> cards, int oldColumn, int newColumn) {
     final newRevealedCards = [...revealedCards];
-    newRevealedCards[oldColumn] =
-        newRevealedCards[oldColumn].sublist(0, newRevealedCards[oldColumn].length - cards.length);
+    newRevealedCards[oldColumn] = newRevealedCards[oldColumn]
+        .sublist(0, newRevealedCards[oldColumn].length - cards.length);
     newRevealedCards[newColumn] = [...newRevealedCards[newColumn], ...cards];
 
     final newHiddenCards = [...hiddenCards];
@@ -282,8 +297,10 @@ class SolitaireState {
   }
 
   SolitaireState? withAutoMove() {
-    final lowestCompletedValue =
-        completedCards.values.map((cards) => cards.lastOrNull).map((card) => card == null ? 0 : getCardValue(card)).min;
+    final lowestCompletedValue = completedCards.values
+        .map((cards) => cards.lastOrNull)
+        .map((card) => card == null ? 0 : getCardValue(card))
+        .min;
 
     bool canAutoMove(SuitedCard? card) {
       if (card == null) {
@@ -299,7 +316,8 @@ class SolitaireState {
       return lowestCompletedValue + 2 >= value;
     }
 
-    final cardsAutoMoveIndex = revealedCards.indexWhere((cards) => cards.isEmpty ? false : canAutoMove(cards.last));
+    final cardsAutoMoveIndex = revealedCards
+        .indexWhere((cards) => cards.isEmpty ? false : canAutoMove(cards.last));
     if (cardsAutoMoveIndex != -1) {
       return withAttemptToComplete(cardsAutoMoveIndex);
     }
@@ -311,7 +329,8 @@ class SolitaireState {
     return null;
   }
 
-  bool get isVictory => completedCards.values.every((cards) => cards.length == 13);
+  bool get isVictory =>
+      completedCards.values.every((cards) => cards.length == 13);
 
   SolitaireState copyWith({
     List<List<SuitedCard>>? hiddenCards,
@@ -324,6 +343,8 @@ class SolitaireState {
     bool? canAutoMove,
     bool saveNewStateToHistory = true,
   }) {
+    final nextHistory = saveNewStateToHistory ? history.push(this) : history;
+
     return SolitaireState(
       hiddenCards: hiddenCards ?? this.hiddenCards,
       revealedCards: revealedCards ?? this.revealedCards,
@@ -334,7 +355,7 @@ class SolitaireState {
       usedUndo: usedUndo ?? this.usedUndo,
       restartedDeck: restartedDeck ?? this.restartedDeck,
       canAutoMove: canAutoMove ?? this.canAutoMove,
-      history: history + [if (saveNewStateToHistory) this],
+      history: nextHistory,
     );
   }
 }
@@ -343,7 +364,8 @@ class Solitaire extends HookConsumerWidget {
   final Difficulty difficulty;
   final bool startWithTutorial;
 
-  const Solitaire({super.key, required this.difficulty, this.startWithTutorial = false});
+  const Solitaire(
+      {super.key, required this.difficulty, this.startWithTutorial = false});
 
   int get drawAmount => switch (difficulty) {
         Difficulty.classic => 1,
@@ -378,7 +400,10 @@ class Solitaire extends HookConsumerWidget {
             message:
                 'Your goal is to build four foundation piles, one for each suit, from Ace to King. Move Aces here first, then build up in suit order.',
           ),
-          TutorialScreen.key(key: drawPileKey, message: 'When you need more cards, tap the draw pile to flip cards.'),
+          TutorialScreen.key(
+              key: drawPileKey,
+              message:
+                  'When you need more cards, tap the draw pile to flip cards.'),
           TutorialScreen.key(
             key: wastePileKey,
             message:
@@ -394,7 +419,8 @@ class Solitaire extends HookConsumerWidget {
 
     useOneTimeEffect(() {
       if (startWithTutorial) {
-        Future.delayed(Duration(milliseconds: 200)).then((_) => startTutorial());
+        Future.delayed(Duration(milliseconds: 200))
+            .then((_) => startTutorial());
       }
       return null;
     });
@@ -403,13 +429,18 @@ class Solitaire extends HookConsumerWidget {
       game: Game.klondike,
       difficulty: difficulty,
       onNewGame: () => state.value = initialState,
-      onRestart: () => state.value = (state.value.history.firstOrNull ?? state.value).copyWith(usedUndo: false),
+      onRestart: () => state.value =
+          (state.value.history.firstOrNull ?? state.value)
+              .copyWith(usedUndo: false),
       onTutorial: startTutorial,
-      onUndo: state.value.history.isEmpty ? null : () => state.value = state.value.withUndo(),
+      onUndo: state.value.history.isEmpty
+          ? null
+          : () => state.value = state.value.withUndo(),
       isVictory: state.value.isVictory,
       onVictory: () => ref
           .read(achievementServiceProvider)
-          .checkSolitaireCompletionAchievements(state: state.value, difficulty: difficulty),
+          .checkSolitaireCompletionAchievements(
+              state: state.value, difficulty: difficulty),
       builder: (context, constraints, cardBack, autoMoveEnabled, gameKey) {
         final axis = constraints.largestAxis;
         final minSize = constraints.smallest.longestSide;
@@ -447,7 +478,8 @@ class Solitaire extends HookConsumerWidget {
           overlayOffset: Offset(0, 1) * cardOffset,
           canMoveCardHere: (_) => false,
           onCardPressed: (_) {
-            state.value = state.value.withAutoMoveFromDeck(onSuccess: () => ref.read(audioServiceProvider).playPlace());
+            state.value = state.value.withAutoMoveFromDeck(
+                onSuccess: () => ref.read(audioServiceProvider).playPlace());
           },
           canGrab: true,
         );
@@ -457,7 +489,8 @@ class Solitaire extends HookConsumerWidget {
                   value: entry.key,
                   values: entry.value,
                   canGrab: true,
-                  onCardPressed: (card) => state.value = state.value.withAutoMoveFromCompleted(
+                  onCardPressed: (card) =>
+                      state.value = state.value.withAutoMoveFromCompleted(
                     entry.key,
                     onSuccess: () => ref.read(audioServiceProvider).playPlace(),
                   ),
@@ -467,7 +500,8 @@ class Solitaire extends HookConsumerWidget {
         return DelayedAutoMoveListener(
           enabled: autoMoveEnabled,
           stateGetter: () => state.value,
-          nextStateGetter: (state) => state.canAutoMove ? state.withAutoMove() : null,
+          nextStateGetter: (state) =>
+              state.canAutoMove ? state.withAutoMove() : null,
           onNewState: (newState) {
             ref.read(audioServiceProvider).playPlace();
             state.value = newState;
@@ -481,7 +515,8 @@ class Solitaire extends HookConsumerWidget {
               emptyGroupOverlayBuilder: (group) => group is CardSuit
                   ? VectorGraphic(
                       loader: PlayingCardAssetBundleCache.getSuitLoader(group),
-                      colorFilter: ColorFilter.mode(Colors.white30, BlendMode.srcIn),
+                      colorFilter:
+                          ColorFilter.mode(Colors.white30, BlendMode.srcIn),
                     )
                   : null,
             ),
@@ -516,8 +551,10 @@ class Solitaire extends HookConsumerWidget {
                             cardOffset: axis.inverted.offset * cardOffset,
                             maxGrabStackSize: null,
                             values: hiddenCards + revealedCards,
-                            canCardBeGrabbed: (_, card) => revealedCards.contains(card),
-                            isCardFlipped: (_, card) => hiddenCards.contains(card),
+                            canCardBeGrabbed: (_, card) =>
+                                revealedCards.contains(card),
+                            isCardFlipped: (_, card) =>
+                                hiddenCards.contains(card),
                             onCardPressed: (card) {
                               if (hiddenCards.contains(card)) {
                                 return;
@@ -528,13 +565,16 @@ class Solitaire extends HookConsumerWidget {
                               state.value = state.value.withAutoTap(
                                 i,
                                 revealedCards.sublist(cardIndex),
-                                onSuccess: () => ref.read(audioServiceProvider).playPlace(),
+                                onSuccess: () =>
+                                    ref.read(audioServiceProvider).playPlace(),
                               );
                             },
-                            canMoveCardHere: (move) => state.value.canMove(move.cardValues, i),
+                            canMoveCardHere: (move) =>
+                                state.value.canMove(move.cardValues, i),
                             onCardMovedHere: (move) {
                               ref.read(audioServiceProvider).playPlace();
-                              state.value = state.value.withMove(move.cardValues, move.fromGroupValue, i);
+                              state.value = state.value.withMove(
+                                  move.cardValues, move.fromGroupValue, i);
                             },
                           );
                         }).toList()),

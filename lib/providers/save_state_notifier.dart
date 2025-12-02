@@ -95,6 +95,23 @@ class SaveStateNotifier extends _$SaveStateNotifier {
     await _saveState(saveState.withCheatCode());
   }
 
+  Future<bool> spendHint() async {
+    final saveState = await future;
+    if (saveState.hints <= 0) {
+      return false;
+    }
+    await _saveState(saveState.withHintSpent());
+    return true;
+  }
+
+  Future<void> addHints(int amount) async {
+    if (amount <= 0) {
+      return;
+    }
+    final saveState = await future;
+    await _saveState(saveState.withHintsAdded(amount));
+  }
+
   Future<void> deleteAllData() async {
     await _saveState(SaveState.empty());
   }

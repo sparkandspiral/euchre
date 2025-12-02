@@ -31,6 +31,7 @@ SaveState _$SaveStateFromJson(Map<String, dynamic> json) => SaveState(
           CardBack.redStripes,
       volume: (json['volume'] as num?)?.toDouble() ?? 1.0,
       enableAutoMove: json['enableAutoMove'] as bool? ?? true,
+      hints: (json['hints'] as num?)?.toInt() ?? defaultHintCount,
     );
 
 Map<String, dynamic> _$SaveStateToJson(SaveState instance) => <String, dynamic>{
@@ -46,6 +47,7 @@ Map<String, dynamic> _$SaveStateToJson(SaveState instance) => <String, dynamic>{
       'cardBack': _$CardBackEnumMap[instance.cardBack]!,
       'volume': instance.volume,
       'enableAutoMove': instance.enableAutoMove,
+      'hints': instance.hints,
     };
 
 const _$GameEnumMap = {

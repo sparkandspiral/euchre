@@ -13,9 +13,11 @@ import 'package:solitaire/home_page.dart';
 import 'package:solitaire/model/card_back.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
+import 'package:solitaire/model/hint.dart';
 import 'package:solitaire/providers/save_state_notifier.dart';
 import 'package:solitaire/services/achievement_service.dart';
 import 'package:solitaire/services/audio_service.dart';
+import 'package:solitaire/services/rewarded_ad_service.dart';
 import 'package:solitaire/utils/build_context_extensions.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
 import 'package:solitaire/utils/duration_extensions.dart';
@@ -31,6 +33,7 @@ class CardScaffold extends HookConsumerWidget {
   final Function() onRestart;
   final Function() onTutorial;
   final Function()? onUndo;
+  final FutureOr<HintSuggestion?> Function()? onHint;
 
   final FutureOr Function()? onVictory;
   final bool isVictory;
@@ -44,6 +47,7 @@ class CardScaffold extends HookConsumerWidget {
     required this.onRestart,
     required this.onTutorial,
     required this.onUndo,
+    this.onHint,
     this.onVictory,
     this.isVictory = false,
   });
@@ -53,6 +57,7 @@ class CardScaffold extends HookConsumerWidget {
     final cardGameContext = context.watch<CardGameContext?>();
     final isPreview = cardGameContext?.isPreview ?? false;
 
+    final isHintProcessing = useState(false);
     final startTimeState = useState(DateTime.now());
     final currentTimeState = useState(DateTime.now());
 
@@ -119,8 +124,138 @@ class CardScaffold extends HookConsumerWidget {
       context.pushReplacement(() => HomePage());
     }
 
+    Future<bool> promptForHintRefill() async {
+      if (!context.mounted) return false;
+
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Out of hints'),
+          content: Text(
+            'Watch a rewarded ad to earn $hintRewardAmount more hints?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Not now'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Watch ad'),
+            ),
+          ],
+        ),
+      );
+
+      return result ?? false;
+    }
+
+    Future<void> handleHintPressed() async {
+      if (onHint == null || isPreview || isVictory || isHintProcessing.value) {
+        return;
+      }
+
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      isHintProcessing.value = true;
+      try {
+        final latestSaveState = ref.read(saveStateNotifierProvider);
+        final hintsAvailable = latestSaveState.valueOrNull?.hints ?? 0;
+
+        if (hintsAvailable <= 0) {
+          final shouldWatchAd = await promptForHintRefill();
+          if (!shouldWatchAd) {
+            return;
+          }
+
+          try {
+            await ref.read(rewardedAdServiceProvider).showRewardedAd(context);
+            await ref
+                .read(saveStateNotifierProvider.notifier)
+                .addHints(hintRewardAmount);
+            messenger?.showSnackBar(
+              SnackBar(
+                content:
+                    Text('You earned $hintRewardAmount additional hints.'),
+              ),
+            );
+          } catch (error) {
+            messenger?.showSnackBar(
+              SnackBar(
+                content: Text('Unable to finish the ad: $error'),
+              ),
+            );
+          }
+          return;
+        }
+
+        final hint = await Future<HintSuggestion?>.sync(onHint!);
+        if (hint == null) {
+          messenger?.showSnackBar(
+            const SnackBar(
+              content: Text('No hint is available right now. Try another move.'),
+            ),
+          );
+          return;
+        }
+
+        final didSpendHint =
+            await ref.read(saveStateNotifierProvider.notifier).spendHint();
+        if (!didSpendHint) {
+          messenger?.showSnackBar(
+            const SnackBar(content: Text('No hints available.')),
+          );
+          return;
+        }
+
+        final detail = hint.detail;
+        final text =
+            detail == null ? hint.message : '${hint.message}\n$detail';
+        messenger?.showSnackBar(SnackBar(content: Text(text)));
+      } finally {
+        isHintProcessing.value = false;
+      }
+    }
+
     if (saveState == null) {
       return SizedBox.shrink();
+    }
+
+    Widget? buildHintControls() {
+      if (isPreview || onHint == null) {
+        return null;
+      }
+
+      final hintCount = saveState.hints;
+      final tooltipText = hintCount > 0
+          ? 'Use a hint'
+          : 'Out of hints — watch an ad to earn $hintRewardAmount more';
+      final disableButton =
+          isHintProcessing.value || isVictory || onHint == null;
+
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 8,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            'Hints: $hintCount',
+            style: const TextStyle(fontSize: 16),
+          ),
+          Tooltip(
+            message: tooltipText,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white.withValues(alpha: 0.5),
+              ),
+              onPressed: disableButton ? null : handleHintPressed,
+              child: Icon(
+                Icons.tips_and_updates,
+                color: hintCount > 0 ? Colors.white : Colors.yellow[200],
+              ),
+            ),
+          ),
+        ],
+      );
     }
 
     return Stack(
@@ -142,66 +277,75 @@ class CardScaffold extends HookConsumerWidget {
                           bottom: false,
                           child: Padding(
                             padding: EdgeInsets.symmetric(horizontal: 8),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              spacing: 8,
-                              children: [
-                                Tooltip(
-                                  message: 'Menu',
-                                  child: MenuAnchor(
-                                    builder: (context, controller, child) {
-                                      return ElevatedButton(
+                            child: Builder(
+                              builder: (context) {
+                                final hintControlsTop = buildHintControls();
+                                return Row(
+                                  mainAxisAlignment: MainAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  spacing: 8,
+                                  children: [
+                                    Tooltip(
+                                      message: 'Menu',
+                                      child: MenuAnchor(
+                                        builder: (context, controller, child) {
+                                          return ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.white.withValues(alpha: 0.5),
+                                            ),
+                                            onPressed: () => controller.open(),
+                                            child: Icon(Icons.menu),
+                                          );
+                                        },
+                                        menuChildren: [
+                                          MenuItemButton(
+                                            leadingIcon: Icon(Icons.star_border),
+                                            onPressed: startNewGame,
+                                            child: Text('New Game'),
+                                          ),
+                                          MenuItemButton(
+                                            leadingIcon: Icon(Icons.restart_alt),
+                                            onPressed: restartGame,
+                                            child: Text('Restart Game'),
+                                          ),
+                                          MenuItemButton(
+                                            leadingIcon: Icon(Icons.question_mark),
+                                            onPressed: onTutorial,
+                                            child: Text('Tutorial'),
+                                          ),
+                                          MenuItemButton(
+                                            leadingIcon: Icon(Icons.close),
+                                            onPressed: closeGame,
+                                            child: Text('Close'),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Tooltip(
+                                      message: 'Undo',
+                                      child: ElevatedButton(
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.white.withValues(alpha: 0.5),
-                                        ),
-                                        onPressed: () => controller.open(),
-                                        child: Icon(Icons.menu),
-                                      );
-                                    },
-                                    menuChildren: [
-                                      MenuItemButton(
-                                        leadingIcon: Icon(Icons.star_border),
-                                        onPressed: startNewGame,
-                                        child: Text('New Game'),
+                                            backgroundColor: Colors.white.withValues(alpha: 0.5)),
+                                        onPressed: isVictory || onUndo == null
+                                            ? null
+                                            : () {
+                                                ref.read(audioServiceProvider).playUndo();
+                                                onUndo?.call();
+                                              },
+                                        child: Icon(Icons.undo),
                                       ),
-                                      MenuItemButton(
-                                        leadingIcon: Icon(Icons.restart_alt),
-                                        onPressed: restartGame,
-                                        child: Text('Restart Game'),
-                                      ),
-                                      MenuItemButton(
-                                        leadingIcon: Icon(Icons.question_mark),
-                                        onPressed: onTutorial,
-                                        child: Text('Tutorial'),
-                                      ),
-                                      MenuItemButton(
-                                        leadingIcon: Icon(Icons.close),
-                                        onPressed: closeGame,
-                                        child: Text('Close'),
-                                      ),
+                                    ),
+                                    Text(
+                                      currentTimeState.value.difference(startTimeState.value).format(),
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                    if (hintControlsTop != null) ...[
+                                      Spacer(),
+                                      hintControlsTop,
                                     ],
-                                  ),
-                                ),
-                                Tooltip(
-                                  message: 'Undo',
-                                  child: ElevatedButton(
-                                    style:
-                                        ElevatedButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: 0.5)),
-                                    onPressed: isVictory || onUndo == null
-                                        ? null
-                                        : () {
-                                            ref.read(audioServiceProvider).playUndo();
-                                            onUndo?.call();
-                                          },
-                                    child: Icon(Icons.undo),
-                                  ),
-                                ),
-                                Text(
-                                  currentTimeState.value.difference(startTimeState.value).format(),
-                                  style: TextStyle(fontSize: 16),
-                                ),
-                              ],
+                                  ],
+                                );
+                              },
                             ),
                           ),
                         ),

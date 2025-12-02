@@ -5,6 +5,7 @@ import 'package:solitaire/model/card_back.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/difficulty_game_state.dart';
 import 'package:solitaire/model/game.dart';
+import 'package:solitaire/model/hint.dart';
 import 'package:solitaire/model/game_state.dart';
 import 'package:utils/utils.dart';
 
@@ -37,6 +38,9 @@ class SaveState {
   @JsonKey(defaultValue: true)
   final bool enableAutoMove;
 
+  @JsonKey(defaultValue: defaultHintCount)
+  final int hints;
+
   const SaveState({
     required this.gameStates,
     required this.achievements,
@@ -47,6 +51,7 @@ class SaveState {
     required this.cardBack,
     required this.volume,
     required this.enableAutoMove,
+    required this.hints,
   });
 
   const SaveState.empty()
@@ -58,7 +63,8 @@ class SaveState {
         background = Background.green,
         cardBack = CardBack.redStripes,
         volume = 1,
-        enableAutoMove = true;
+        enableAutoMove = true,
+        hints = defaultHintCount;
 
   factory SaveState.fromJson(Map<String, dynamic> json) =>
       _$SaveStateFromJson(json);
@@ -109,6 +115,20 @@ class SaveState {
   SaveState withAchievementRemoved({required Achievement achievement}) =>
       copyWith(achievements: {...achievements}..remove(achievement));
 
+  SaveState withHintsAdded(int amount) {
+    if (amount <= 0) {
+      return this;
+    }
+    return copyWith(hints: hints + amount);
+  }
+
+  SaveState withHintSpent() {
+    if (hints <= 0) {
+      return this;
+    }
+    return copyWith(hints: hints - 1);
+  }
+
   SaveState withCheatCode() => copyWith(
         gameStates: Game.values.mapToMap((value) => MapEntry(
               value,
@@ -135,6 +155,7 @@ class SaveState {
     CardBack? cardBack,
     double? volume,
     bool? enableAutoMove,
+    int? hints,
   }) {
     return SaveState(
       gameStates: gameStates ?? this.gameStates,
@@ -147,6 +168,7 @@ class SaveState {
       cardBack: cardBack ?? this.cardBack,
       volume: volume ?? this.volume,
       enableAutoMove: enableAutoMove ?? this.enableAutoMove,
+      hints: hints ?? this.hints,
     );
   }
 }

@@ -10,32 +10,30 @@ enum Difficulty {
   ace;
 
   String get title => switch (this) {
-        Difficulty.classic => 'Classic',
-        Difficulty.royal => 'Royal',
-        Difficulty.ace => 'Ace',
+        Difficulty.classic => 'Easy',
+        Difficulty.royal => 'Medium',
+        Difficulty.ace => 'Hard',
       };
 
   String getDescription(Game game) => switch (this) {
         Difficulty.classic => game == Game.spider
-            ? 'Play with one suit (Spades only).'
-            : 'The original ruleset as traditionally played.',
+            ? 'Single suit for calm clears.'
+            : 'Standard layout with a gentle pace.',
         Difficulty.royal => switch (game) {
-            Game.golf => 'One card is automatically drawn at the start.',
-            Game.klondike => 'Cards are drawn three at a time.',
-            Game.freeCell => 'Play with one fewer free cell.',
-            Game.spider => 'Play with two suits (Spades and Hearts).',
-            Game.pyramid => 'Start with one waste card to widen pairing options.',
-            Game.triPeaks => 'Start with one waste card for an easier start.',
+            Game.golf => 'Start with one bonus draw.',
+            Game.klondike => 'Draw three cards at a time.',
+            Game.freeCell => 'Only three free cells available.',
+            Game.spider => 'Two suits keep you alert.',
+            Game.pyramid => 'Begin with one waste card.',
+            Game.triPeaks => 'Begin with one waste card.',
           },
         Difficulty.ace => switch (game) {
-            Game.golf => 'One card is automatically drawn at the start, and Kings cannot wrap to Aces.',
-            Game.klondike =>
-              'Cards are drawn three at a time and all aces are buried at the bottom of the last four tableaus.',
-            Game.freeCell =>
-              'Play with one fewer free cell and all aces are buried at the bottom of the first four tableaus.',
-            Game.spider => 'Play with all four suits - the ultimate challenge!',
-            Game.pyramid => 'Aces are buried to the bottom of the stock for a tougher start.',
-            Game.triPeaks => 'Kings cannot wrap to Aces - must plan your moves carefully!',
+            Game.golf => 'Bonus draw and no King-to-Ace wrap.',
+            Game.klondike => 'Draw three with buried aces.',
+            Game.freeCell => 'Three cells and buried aces.',
+            Game.spider => 'All four suits, full gauntlet.',
+            Game.pyramid => 'Buried aces slow the stock.',
+            Game.triPeaks => 'No King-to-Ace wrap; plan ahead.',
           },
       };
 

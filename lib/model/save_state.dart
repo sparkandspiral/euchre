@@ -60,10 +60,12 @@ class SaveState {
         volume = 1,
         enableAutoMove = true;
 
-  factory SaveState.fromJson(Map<String, dynamic> json) => _$SaveStateFromJson(json);
+  factory SaveState.fromJson(Map<String, dynamic> json) =>
+      _$SaveStateFromJson(json);
   Map<String, dynamic> toJson() => _$SaveStateToJson(this);
 
-  GameState getOrDefault(Game game) => gameStates[game] ?? GameState(states: {});
+  GameState getOrDefault(Game game) =>
+      gameStates[game] ?? GameState(states: {});
 
   SaveState withGameCompleted({
     required Game game,
@@ -73,13 +75,20 @@ class SaveState {
       copyWith(
         gameStates: {
           ...gameStates,
-          game: getOrDefault(game).withCompleted(difficulty: difficulty, duration: duration),
+          game: getOrDefault(game)
+              .withCompleted(difficulty: difficulty, duration: duration),
         },
         winStreak: winStreak + 1,
       );
 
-  SaveState withGameStarted({required Game game, required Difficulty difficulty}) => copyWith(
-        lastGamePlayed: game,
+  SaveState withGameStarted(
+          {required Game game, required Difficulty difficulty}) =>
+      withDefaultDifficulty(game: game, difficulty: difficulty)
+          .copyWith(lastGamePlayed: game);
+
+  SaveState withDefaultDifficulty(
+          {required Game game, required Difficulty difficulty}) =>
+      copyWith(
         lastPlayedGameDifficulties: {
           ...lastPlayedGameDifficulties,
           game: difficulty,
@@ -88,10 +97,13 @@ class SaveState {
 
   SaveState withCloseOrRestart() => copyWith(winStreak: 0);
 
-  SaveState withBackground({required Background background}) => copyWith(background: background);
-  SaveState withCardBack({required CardBack cardBack}) => copyWith(cardBack: cardBack);
+  SaveState withBackground({required Background background}) =>
+      copyWith(background: background);
+  SaveState withCardBack({required CardBack cardBack}) =>
+      copyWith(cardBack: cardBack);
   SaveState withVolume({required double volume}) => copyWith(volume: volume);
-  SaveState withAutoMoveEnabled({required bool enableAutoMove}) => copyWith(enableAutoMove: enableAutoMove);
+  SaveState withAutoMoveEnabled({required bool enableAutoMove}) =>
+      copyWith(enableAutoMove: enableAutoMove);
   SaveState withAchievement({required Achievement achievement}) =>
       copyWith(achievements: {...achievements, achievement});
   SaveState withAchievementRemoved({required Achievement achievement}) =>
@@ -104,7 +116,8 @@ class SaveState {
                 states: Difficulty.values.mapToMap(
                   (difficulty) => MapEntry(
                     difficulty,
-                    DifficultyGameState(fastestGame: Duration(minutes: 5), gamesWon: 1),
+                    DifficultyGameState(
+                        fastestGame: Duration(minutes: 5), gamesWon: 1),
                   ),
                 ),
               ),
@@ -127,7 +140,8 @@ class SaveState {
       gameStates: gameStates ?? this.gameStates,
       achievements: achievements ?? this.achievements,
       lastGamePlayed: lastGamePlayed ?? this.lastGamePlayed,
-      lastPlayedGameDifficulties: lastPlayedGameDifficulties ?? this.lastPlayedGameDifficulties,
+      lastPlayedGameDifficulties:
+          lastPlayedGameDifficulties ?? this.lastPlayedGameDifficulties,
       winStreak: winStreak ?? this.winStreak,
       background: background ?? this.background,
       cardBack: cardBack ?? this.cardBack,

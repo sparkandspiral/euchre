@@ -20,7 +20,8 @@ class SaveStateNotifier extends _$SaveStateNotifier {
   FutureOr<SaveState> build() async {
     final sharedPreferences = await SharedPreferences.getInstance();
     final saveStateRaw = sharedPreferences.getString(_saveStateKey);
-    final saveState = guard(() => saveStateRaw?.mapIfNonNull((raw) => SaveState.fromJson(jsonDecode(raw))));
+    final saveState = guard(() => saveStateRaw
+        ?.mapIfNonNull((raw) => SaveState.fromJson(jsonDecode(raw))));
     return saveState ?? SaveState.empty();
   }
 
@@ -30,7 +31,8 @@ class SaveStateNotifier extends _$SaveStateNotifier {
     required Duration duration,
   }) async {
     final saveState = await future;
-    await _saveState(saveState.withGameCompleted(game: game, difficulty: difficulty, duration: duration));
+    await _saveState(saveState.withGameCompleted(
+        game: game, difficulty: difficulty, duration: duration));
   }
 
   Future<void> saveGameStarted({
@@ -38,7 +40,17 @@ class SaveStateNotifier extends _$SaveStateNotifier {
     required Difficulty difficulty,
   }) async {
     final saveState = await future;
-    await _saveState(saveState.withGameStarted(game: game, difficulty: difficulty));
+    await _saveState(
+        saveState.withGameStarted(game: game, difficulty: difficulty));
+  }
+
+  Future<void> saveDefaultDifficulty({
+    required Game game,
+    required Difficulty difficulty,
+  }) async {
+    final saveState = await future;
+    await _saveState(
+        saveState.withDefaultDifficulty(game: game, difficulty: difficulty));
   }
 
   Future<void> saveGameCloseOrRestart() async {
@@ -63,7 +75,8 @@ class SaveStateNotifier extends _$SaveStateNotifier {
 
   Future<void> saveEnableAutoMove({required bool enableAutoMove}) async {
     final saveState = await future;
-    await _saveState(saveState.withAutoMoveEnabled(enableAutoMove: enableAutoMove));
+    await _saveState(
+        saveState.withAutoMoveEnabled(enableAutoMove: enableAutoMove));
   }
 
   Future<void> saveAchievement({required Achievement achievement}) async {
@@ -73,7 +86,8 @@ class SaveStateNotifier extends _$SaveStateNotifier {
 
   Future<void> deleteAchievement({required Achievement achievement}) async {
     final saveState = await future;
-    await _saveState(saveState.withAchievementRemoved(achievement: achievement));
+    await _saveState(
+        saveState.withAchievementRemoved(achievement: achievement));
   }
 
   Future<void> saveCheatCode() async {

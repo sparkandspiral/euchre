@@ -19,32 +19,39 @@ import 'package:solitaire/utils/build_context_extensions.dart';
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
-  Map<Game, Widget Function(Difficulty, bool startWithTutorial)> get gameBuilders => {
-        Game.klondike: (Difficulty difficulty, bool startWithTutorial) => Solitaire(
-              difficulty: difficulty,
-              startWithTutorial: startWithTutorial,
-            ),
-        Game.spider: (Difficulty difficulty, bool startWithTutorial) => SpiderSolitaire(
-              difficulty: difficulty,
-              startWithTutorial: startWithTutorial,
-            ),
-        Game.freeCell: (Difficulty difficulty, bool startWithTutorial) => FreeCell(
-              difficulty: difficulty,
-              startWithTutorial: startWithTutorial,
-            ),
-        Game.pyramid: (Difficulty difficulty, bool startWithTutorial) => PyramidSolitaire(
-              difficulty: difficulty,
-              startWithTutorial: startWithTutorial,
-            ),
-        Game.golf: (Difficulty difficulty, bool startWithTutorial) => GolfSolitaire(
-              difficulty: difficulty,
-              startWithTutorial: startWithTutorial,
-            ),
-        Game.triPeaks: (Difficulty difficulty, bool startWithTutorial) => TriPeaksSolitaire(
-              difficulty: difficulty,
-              startWithTutorial: startWithTutorial,
-            ),
-      };
+  Map<Game, Widget Function(Difficulty, bool startWithTutorial)>
+      get gameBuilders => {
+            Game.klondike: (Difficulty difficulty, bool startWithTutorial) =>
+                Solitaire(
+                  difficulty: difficulty,
+                  startWithTutorial: startWithTutorial,
+                ),
+            Game.spider: (Difficulty difficulty, bool startWithTutorial) =>
+                SpiderSolitaire(
+                  difficulty: difficulty,
+                  startWithTutorial: startWithTutorial,
+                ),
+            Game.freeCell: (Difficulty difficulty, bool startWithTutorial) =>
+                FreeCell(
+                  difficulty: difficulty,
+                  startWithTutorial: startWithTutorial,
+                ),
+            Game.pyramid: (Difficulty difficulty, bool startWithTutorial) =>
+                PyramidSolitaire(
+                  difficulty: difficulty,
+                  startWithTutorial: startWithTutorial,
+                ),
+            Game.golf: (Difficulty difficulty, bool startWithTutorial) =>
+                GolfSolitaire(
+                  difficulty: difficulty,
+                  startWithTutorial: startWithTutorial,
+                ),
+            Game.triPeaks: (Difficulty difficulty, bool startWithTutorial) =>
+                TriPeaksSolitaire(
+                  difficulty: difficulty,
+                  startWithTutorial: startWithTutorial,
+                ),
+          };
 
   // Game-specific gradient colors
   Map<Game, List<Color>> get gameGradients => {
@@ -82,6 +89,68 @@ class HomePage extends ConsumerWidget {
       case Game.triPeaks:
         return Icons.filter_hdr;
     }
+  }
+
+  void _startGame({
+    required BuildContext context,
+    required WidgetRef ref,
+    required Game game,
+    required Widget Function(Difficulty, bool) builder,
+    required Difficulty difficulty,
+  }) {
+    context
+        .pushReplacement(() => GameView(cardGame: builder(difficulty, false)));
+    ref.read(saveStateNotifierProvider.notifier).saveGameStarted(
+          game: game,
+          difficulty: difficulty,
+        );
+  }
+
+  void _showDifficultySelector({
+    required BuildContext rootContext,
+    required WidgetRef ref,
+    required Game game,
+    required Widget Function(Difficulty, bool) builder,
+    required Difficulty currentDefault,
+  }) {
+    final notifier = ref.read(saveStateNotifierProvider.notifier);
+    var selectedDifficulty = currentDefault;
+    var defaultDifficulty = currentDefault;
+
+    showModalBottomSheet(
+      context: rootContext,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (innerContext, setState) {
+            return _DifficultySheet(
+              game: game,
+              selectedDifficulty: selectedDifficulty,
+              defaultDifficulty: defaultDifficulty,
+              onSelectDifficulty: (difficulty) {
+                setState(() => selectedDifficulty = difficulty);
+              },
+              onDefaultChanged: (difficulty) async {
+                setState(() => defaultDifficulty = difficulty);
+                await notifier.saveDefaultDifficulty(
+                    game: game, difficulty: difficulty);
+              },
+              onPlay: () {
+                Navigator.of(sheetContext).pop();
+                _startGame(
+                  context: rootContext,
+                  ref: ref,
+                  game: game,
+                  builder: builder,
+                  difficulty: selectedDifficulty,
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -156,20 +225,29 @@ class HomePage extends ConsumerWidget {
             itemBuilder: (context, index) {
               final game = gameBuilders.keys.elementAt(index);
               final builder = gameBuilders[game]!;
-              final difficulty = saveState.lastPlayedGameDifficulties[game] ?? Difficulty.classic;
+              final difficulty = saveState.lastPlayedGameDifficulties[game] ??
+                  Difficulty.classic;
 
               return _GameCard(
                 game: game,
                 gradient: gameGradients[game]!,
                 icon: getGameIcon(game),
                 logoAsset: gameLogos[game]!,
-                onTap: () {
-                  context.pushReplacement(() => GameView(cardGame: builder(difficulty, false)));
-                  ref.read(saveStateNotifierProvider.notifier).saveGameStarted(
-                        game: game,
-                        difficulty: difficulty,
-                      );
-                },
+                defaultDifficulty: difficulty,
+                onSelectDifficulty: () => _showDifficultySelector(
+                  rootContext: context,
+                  ref: ref,
+                  game: game,
+                  builder: builder,
+                  currentDefault: difficulty,
+                ),
+                onQuickStart: () => _startGame(
+                  context: context,
+                  ref: ref,
+                  game: game,
+                  builder: builder,
+                  difficulty: difficulty,
+                ),
               );
             },
           );
@@ -184,14 +262,18 @@ class _GameCard extends StatelessWidget {
   final List<Color> gradient;
   final IconData icon;
   final String logoAsset;
-  final VoidCallback onTap;
+  final Difficulty defaultDifficulty;
+  final VoidCallback onSelectDifficulty;
+  final VoidCallback onQuickStart;
 
   const _GameCard({
     required this.game,
     required this.gradient,
     required this.icon,
     required this.logoAsset,
-    required this.onTap,
+    required this.defaultDifficulty,
+    required this.onSelectDifficulty,
+    required this.onQuickStart,
   });
 
   @override
@@ -199,7 +281,7 @@ class _GameCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: onSelectDifficulty,
         borderRadius: BorderRadius.circular(16),
         child: Container(
           decoration: BoxDecoration(
@@ -211,7 +293,7 @@ class _GameCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withValues(alpha: 0.3),
                 blurRadius: 8,
                 offset: Offset(0, 4),
               ),
@@ -242,7 +324,7 @@ class _GameCard extends StatelessWidget {
                           Container(
                             padding: EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
@@ -262,6 +344,17 @@ class _GameCard extends StatelessWidget {
                               ),
                             ),
                           ),
+                          Tooltip(
+                            message: 'Quick start (${defaultDifficulty.title})',
+                            child: IconButton(
+                              onPressed: onQuickStart,
+                              icon: Icon(
+                                Icons.play_circle_fill_rounded,
+                                color: Colors.white,
+                                size: 26,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                       Spacer(),
@@ -278,23 +371,286 @@ class _GameCard extends StatelessWidget {
                         ),
                       ),
                       Spacer(),
-                      // Play hint
-                      // Center(
-                      //   child: Text(
-                      //     'Tap to Play',
-                      //     style: TextStyle(
-                      //       color: Colors.white.withOpacity(0.9),
-                      //       fontSize: 14,
-                      //       fontWeight: FontWeight.w500,
-                      //     ),
-                      //   ),
-                      // ),
+                      Align(
+                        alignment: Alignment.bottomLeft,
+                        child: Container(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.bolt,
+                                size: 14,
+                                color: Colors.white70,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'Default: ${defaultDifficulty.title}',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DifficultySheet extends StatelessWidget {
+  final Game game;
+  final Difficulty selectedDifficulty;
+  final Difficulty defaultDifficulty;
+  final ValueChanged<Difficulty> onSelectDifficulty;
+  final ValueChanged<Difficulty> onDefaultChanged;
+  final VoidCallback onPlay;
+
+  const _DifficultySheet({
+    required this.game,
+    required this.selectedDifficulty,
+    required this.defaultDifficulty,
+    required this.onSelectDifficulty,
+    required this.onDefaultChanged,
+    required this.onPlay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomPadding),
+        child: SingleChildScrollView(
+          physics: BouncingScrollPhysics(),
+          child: Container(
+            margin: EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(
+              color: Color(0xFF0A2340),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: EdgeInsets.fromLTRB(24, 16, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 48,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 18),
+                Text(
+                  game.title,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Choose a difficulty before you play.',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                ),
+                SizedBox(height: 24),
+                ...Difficulty.values.map(
+                  (difficulty) => _DifficultyOptionTile(
+                    game: game,
+                    difficulty: difficulty,
+                    isSelected: selectedDifficulty == difficulty,
+                    isDefault: defaultDifficulty == difficulty,
+                    onTap: () => onSelectDifficulty(difficulty),
+                    onSetDefault: () => onDefaultChanged(difficulty),
+                  ),
+                ),
+                SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: onPlay,
+                    child: Text('Play ${selectedDifficulty.title}'),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text('Cancel'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DifficultyOptionTile extends StatelessWidget {
+  final Game game;
+  final Difficulty difficulty;
+  final bool isSelected;
+  final bool isDefault;
+  final VoidCallback onTap;
+  final VoidCallback onSetDefault;
+
+  const _DifficultyOptionTile({
+    required this.game,
+    required this.difficulty,
+    required this.isSelected,
+    required this.isDefault,
+    required this.onTap,
+    required this.onSetDefault,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final titleStyle = TextStyle(
+      color: Colors.white,
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+    );
+
+    final descriptionStyle = TextStyle(
+      color: Colors.white70,
+      fontSize: 13,
+    );
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Color(0xFF132A4A),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected
+                  ? Color(0xFFFFD700)
+                  : Colors.white.withValues(alpha: 0.08),
+              width: 1.4,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  difficulty.icon,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(difficulty.title, style: titleStyle),
+                        SizedBox(width: 8),
+                        if (isSelected)
+                          _DifficultyBadge(
+                            label: 'Selected',
+                            color: Color(0xFFFFD700),
+                          ),
+                        if (isDefault)
+                          Padding(
+                            padding: EdgeInsets.only(left: 6),
+                            child: _DifficultyBadge(
+                              label: 'Default',
+                              color: Color(0xFF6BE5FF),
+                            ),
+                          ),
+                      ],
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      difficulty.getDescription(game),
+                      style: descriptionStyle,
+                    ),
+                  ],
+                ),
+              ),
+              Tooltip(
+                message: isDefault
+                    ? 'Quick start uses this difficulty'
+                    : 'Set as quick start default',
+                child: IconButton(
+                  onPressed: onSetDefault,
+                  splashRadius: 18,
+                  padding: EdgeInsets.zero,
+                  constraints: BoxConstraints(),
+                  icon: Icon(
+                    isDefault
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DifficultyBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _DifficultyBadge({
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

@@ -7,4 +7,3 @@ class HintSuggestion {
 
 const int defaultHintCount = 10;
 const int hintRewardAmount = 10;
-

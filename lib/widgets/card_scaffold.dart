@@ -27,7 +27,8 @@ class CardScaffold extends HookConsumerWidget {
   final Game game;
   final Difficulty difficulty;
 
-  final Widget Function(BuildContext, BoxConstraints, CardBack, bool autoMoveEnabled, Object gameKey) builder;
+  final Widget Function(BuildContext, BoxConstraints, CardBack,
+      bool autoMoveEnabled, Object gameKey) builder;
 
   final Function() onNewGame;
   final Function() onRestart;
@@ -66,16 +67,15 @@ class CardScaffold extends HookConsumerWidget {
 
     useEffect(() {
       if (isVictory) {
-        final duration = currentTimeState.value.difference(startTimeState.value);
+        final duration =
+            currentTimeState.value.difference(startTimeState.value);
         () async {
           ref.read(audioServiceProvider).playWin();
           await onVictory?.call();
-          await ref
-              .read(saveStateNotifierProvider.notifier)
-              .saveGameCompleted(game: game, difficulty: difficulty, duration: duration);
-          ref
-              .read(achievementServiceProvider)
-              .checkGameCompletionAchievements(game: game, difficulty: difficulty, duration: duration);
+          await ref.read(saveStateNotifierProvider.notifier).saveGameCompleted(
+              game: game, difficulty: difficulty, duration: duration);
+          ref.read(achievementServiceProvider).checkGameCompletionAchievements(
+              game: game, difficulty: difficulty, duration: duration);
         }();
       }
       return null;
@@ -98,7 +98,8 @@ class CardScaffold extends HookConsumerWidget {
       [isVictory],
     ));
 
-    final confettiController = useMemoized(() => ConfettiController(duration: Duration(milliseconds: 50))..play());
+    final confettiController = useMemoized(
+        () => ConfettiController(duration: Duration(milliseconds: 50))..play());
     useEffect(() => () => confettiController.dispose(), []);
 
     if (isVictory) {
@@ -174,8 +175,7 @@ class CardScaffold extends HookConsumerWidget {
                 .addHints(hintRewardAmount);
             messenger?.showSnackBar(
               SnackBar(
-                content:
-                    Text('You earned $hintRewardAmount additional hints.'),
+                content: Text('You earned $hintRewardAmount additional hints.'),
               ),
             );
           } catch (error) {
@@ -192,7 +192,8 @@ class CardScaffold extends HookConsumerWidget {
         if (hint == null) {
           messenger?.showSnackBar(
             const SnackBar(
-              content: Text('No hint is available right now. Try another move.'),
+              content:
+                  Text('No hint is available right now. Try another move.'),
             ),
           );
           return;
@@ -208,8 +209,7 @@ class CardScaffold extends HookConsumerWidget {
         }
 
         final detail = hint.detail;
-        final text =
-            detail == null ? hint.message : '${hint.message}\n$detail';
+        final text = detail == null ? hint.message : '${hint.message}\n$detail';
         messenger?.showSnackBar(SnackBar(content: Text(text)));
       } finally {
         isHintProcessing.value = false;
@@ -291,7 +291,8 @@ class CardScaffold extends HookConsumerWidget {
                                         builder: (context, controller, child) {
                                           return ElevatedButton(
                                             style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.white.withValues(alpha: 0.5),
+                                              backgroundColor: Colors.white
+                                                  .withValues(alpha: 0.5),
                                             ),
                                             onPressed: () => controller.open(),
                                             child: Icon(Icons.menu),
@@ -299,17 +300,20 @@ class CardScaffold extends HookConsumerWidget {
                                         },
                                         menuChildren: [
                                           MenuItemButton(
-                                            leadingIcon: Icon(Icons.star_border),
+                                            leadingIcon:
+                                                Icon(Icons.star_border),
                                             onPressed: startNewGame,
                                             child: Text('New Game'),
                                           ),
                                           MenuItemButton(
-                                            leadingIcon: Icon(Icons.restart_alt),
+                                            leadingIcon:
+                                                Icon(Icons.restart_alt),
                                             onPressed: restartGame,
                                             child: Text('Restart Game'),
                                           ),
                                           MenuItemButton(
-                                            leadingIcon: Icon(Icons.question_mark),
+                                            leadingIcon:
+                                                Icon(Icons.question_mark),
                                             onPressed: onTutorial,
                                             child: Text('Tutorial'),
                                           ),
@@ -325,18 +329,23 @@ class CardScaffold extends HookConsumerWidget {
                                       message: 'Undo',
                                       child: ElevatedButton(
                                         style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.white.withValues(alpha: 0.5)),
+                                            backgroundColor: Colors.white
+                                                .withValues(alpha: 0.5)),
                                         onPressed: isVictory || onUndo == null
                                             ? null
                                             : () {
-                                                ref.read(audioServiceProvider).playUndo();
+                                                ref
+                                                    .read(audioServiceProvider)
+                                                    .playUndo();
                                                 onUndo?.call();
                                               },
                                         child: Icon(Icons.undo),
                                       ),
                                     ),
                                     Text(
-                                      currentTimeState.value.difference(startTimeState.value).format(),
+                                      currentTimeState.value
+                                          .difference(startTimeState.value)
+                                          .format(),
                                       style: TextStyle(fontSize: 16),
                                     ),
                                     if (hintControlsTop != null) ...[
@@ -372,7 +381,8 @@ class CardScaffold extends HookConsumerWidget {
                     ),
                     if (!isPreview && axis == Axis.vertical)
                       Container(
-                        height: max(MediaQuery.paddingOf(context).bottom + 32, 48),
+                        height:
+                            max(MediaQuery.paddingOf(context).bottom + 32, 48),
                         color: Colors.white.withValues(alpha: 0.2),
                         alignment: Alignment.center,
                         child: SafeArea(
@@ -380,76 +390,93 @@ class CardScaffold extends HookConsumerWidget {
                           bottom: false,
                           child: Padding(
                             padding: EdgeInsets.symmetric(horizontal: 24),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Tooltip(
-                                  message: 'Menu',
-                                  child: ElevatedButton(
-                                    style:
-                                        ElevatedButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: 0.5)),
-                                    onPressed: () async {
-                                      await showAdaptiveActionSheet(
-                                        context: context,
-                                        actions: [
-                                          BottomSheetAction(
-                                            title: Text('New Game'),
-                                            leading: Icon(Icons.star_border),
-                                            onPressed: (context) {
-                                              startNewGame();
-                                              Navigator.of(context).pop();
-                                            },
-                                          ),
-                                          BottomSheetAction(
-                                            title: Text('Restart Game'),
-                                            leading: Icon(Icons.restart_alt),
-                                            onPressed: (_) {
-                                              restartGame();
-                                              Navigator.of(context).pop();
-                                            },
-                                          ),
-                                          BottomSheetAction(
-                                            title: Text('Tutorial'),
-                                            leading: Icon(Icons.question_mark),
-                                            onPressed: (_) {
-                                              onTutorial();
-                                              Navigator.of(context).pop();
-                                            },
-                                          ),
-                                          BottomSheetAction(
-                                            title: Text('Close'),
-                                            leading: Icon(Icons.close),
-                                            onPressed: (_) {
-                                              Navigator.of(context).pop();
-                                              closeGame();
-                                            },
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                    child: Icon(Icons.menu),
-                                  ),
-                                ),
-                                Text(
-                                  currentTimeState.value.difference(startTimeState.value).format(),
-                                  style: TextStyle(fontSize: 16),
-                                ),
-                                Tooltip(
-                                  message: 'Undo',
-                                  child: ElevatedButton(
-                                    style:
-                                        ElevatedButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: 0.5)),
-                                    onPressed: isVictory || onUndo == null
-                                        ? null
-                                        : () {
-                                            ref.read(audioServiceProvider).playUndo();
-                                            onUndo?.call();
-                                          },
-                                    child: Icon(Icons.undo),
-                                  ),
-                                ),
-                              ],
+                            child: Builder(
+                              builder: (context) {
+                                final hintControlsBottom = buildHintControls();
+                                return Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Tooltip(
+                                      message: 'Menu',
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.white
+                                                .withValues(alpha: 0.5)),
+                                        onPressed: () async {
+                                          await showAdaptiveActionSheet(
+                                            context: context,
+                                            actions: [
+                                              BottomSheetAction(
+                                                title: Text('New Game'),
+                                                leading:
+                                                    Icon(Icons.star_border),
+                                                onPressed: (context) {
+                                                  startNewGame();
+                                                  Navigator.of(context).pop();
+                                                },
+                                              ),
+                                              BottomSheetAction(
+                                                title: Text('Restart Game'),
+                                                leading:
+                                                    Icon(Icons.restart_alt),
+                                                onPressed: (_) {
+                                                  restartGame();
+                                                  Navigator.of(context).pop();
+                                                },
+                                              ),
+                                              BottomSheetAction(
+                                                title: Text('Tutorial'),
+                                                leading:
+                                                    Icon(Icons.question_mark),
+                                                onPressed: (_) {
+                                                  onTutorial();
+                                                  Navigator.of(context).pop();
+                                                },
+                                              ),
+                                              BottomSheetAction(
+                                                title: Text('Close'),
+                                                leading: Icon(Icons.close),
+                                                onPressed: (_) {
+                                                  Navigator.of(context).pop();
+                                                  closeGame();
+                                                },
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                        child: Icon(Icons.menu),
+                                      ),
+                                    ),
+                                    Text(
+                                      currentTimeState.value
+                                          .difference(startTimeState.value)
+                                          .format(),
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                    if (hintControlsBottom != null)
+                                      Flexible(child: hintControlsBottom),
+                                    Tooltip(
+                                      message: 'Undo',
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.white
+                                                .withValues(alpha: 0.5)),
+                                        onPressed: isVictory || onUndo == null
+                                            ? null
+                                            : () {
+                                                ref
+                                                    .read(audioServiceProvider)
+                                                    .playUndo();
+                                                onUndo?.call();
+                                              },
+                                        child: Icon(Icons.undo),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
                           ),
                         ),
@@ -502,12 +529,15 @@ class CardScaffold extends HookConsumerWidget {
                       ),
                       SizedBox(height: 16),
                       MarkdownBody(
-                          data: '**Time**: ${currentTimeState.value.difference(startTimeState.value).format()}'),
+                          data:
+                              '**Time**: ${currentTimeState.value.difference(startTimeState.value).format()}'),
                       MarkdownBody(
                         data:
                             '**Best Time**: ${(difficultyGameState?.fastestGame ?? currentTimeState.value.difference(startTimeState.value)).format()}',
                       ),
-                      MarkdownBody(data: '**Games Won**: ${difficultyGameState?.gamesWon ?? 1}'),
+                      MarkdownBody(
+                          data:
+                              '**Games Won**: ${difficultyGameState?.gamesWon ?? 1}'),
                       SizedBox(height: 16),
                       Wrap(
                         spacing: 8,
@@ -528,7 +558,8 @@ class CardScaffold extends HookConsumerWidget {
                             icon: Icon(Icons.restart_alt),
                           ),
                           ElevatedButton.icon(
-                            onPressed: () => context.pushReplacement(() => HomePage()),
+                            onPressed: () =>
+                                context.pushReplacement(() => HomePage()),
                             label: Text('Close'),
                             icon: Icon(Icons.close),
                           ),

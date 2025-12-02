@@ -9,12 +9,14 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/immutable_history.dart';
+import 'package:solitaire/model/hint.dart';
 import 'package:solitaire/services/achievement_service.dart';
 import 'package:solitaire/services/audio_service.dart';
 import 'package:solitaire/styles/playing_card_asset_bundle_cache.dart';
 import 'package:solitaire/styles/playing_card_style.dart';
 import 'package:solitaire/utils/axis_extensions.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
+import 'package:solitaire/utils/card_description.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/delayed_auto_move_listener.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
@@ -173,6 +175,103 @@ class FreeCellState {
 
   bool canMoveToFreeCell(SuitedCard card, int cellIndex) =>
       freeCells[cellIndex] == null;
+
+  HintSuggestion? findHint() {
+    HintSuggestion describeFoundationMove(String source, SuitedCard card) {
+      return HintSuggestion(
+        message:
+            'Move ${describeCard(card)} from $source to the ${describeSuitName(card.suit)} foundation.',
+      );
+    }
+
+    for (int column = 0; column < tableauCards.length; column++) {
+      final card = tableauCards[column].lastOrNull;
+      if (card != null && canAddToFoundation(card)) {
+        return describeFoundationMove(describeColumn(column), card);
+      }
+    }
+
+    for (int cell = 0; cell < freeCells.length; cell++) {
+      final card = freeCells[cell];
+      if (card != null && canAddToFoundation(card)) {
+        return describeFoundationMove(describeFreeCell(cell), card);
+      }
+    }
+
+    for (int cell = 0; cell < freeCells.length; cell++) {
+      final card = freeCells[cell];
+      if (card == null) continue;
+
+      for (int column = 0; column < tableauCards.length; column++) {
+        if (canMoveToTableau([card], column)) {
+          final targetTop = tableauCards[column].lastOrNull;
+          final targetDescription = targetTop == null
+              ? 'empty ${describeColumn(column)}'
+              : '${describeCard(targetTop)} in ${describeColumn(column)}';
+          return HintSuggestion(
+            message:
+                'Play ${describeCard(card)} from ${describeFreeCell(cell)} onto $targetDescription.',
+          );
+        }
+      }
+    }
+
+    HintSuggestion? bestMove;
+    for (int from = 0; from < tableauCards.length; from++) {
+      final columnCards = tableauCards[from];
+      for (int start = 0; start < columnCards.length; start++) {
+        final moving = columnCards.sublist(start);
+        if (!isValidSequence(moving)) {
+          continue;
+        }
+
+        for (int target = 0; target < tableauCards.length; target++) {
+          if (target == from) continue;
+          if (!canMoveToTableau(moving, target)) continue;
+
+          final targetTop = tableauCards[target].lastOrNull;
+          final targetDescription = targetTop == null
+              ? 'empty ${describeColumn(target)}'
+              : '${describeCard(targetTop)} in ${describeColumn(target)}';
+
+          final clearsColumn =
+              start == 0 && moving.length == columnCards.length;
+          final hint = HintSuggestion(
+            message:
+                'Move ${describeCardSequence(moving)} from ${describeColumn(from)} onto $targetDescription.',
+            detail: clearsColumn
+                ? 'This opens ${describeColumn(from)} for future plays.'
+                : null,
+          );
+
+          if (clearsColumn) {
+            return hint;
+          }
+
+          bestMove ??= hint;
+        }
+      }
+    }
+
+    if (bestMove != null) {
+      return bestMove;
+    }
+
+    final emptyCell = freeCells.indexWhere((cell) => cell == null);
+    if (emptyCell != -1) {
+      final columnIndex =
+          tableauCards.indexWhere((column) => column.length > 1);
+      if (columnIndex != -1) {
+        final card = tableauCards[columnIndex].last;
+        return HintSuggestion(
+          message:
+              'Store ${describeCard(card)} from ${describeColumn(columnIndex)} in ${describeFreeCell(emptyCell)} to free space.',
+        );
+      }
+    }
+
+    return null;
+  }
 
   FreeCellState withMoveFromTableauToTableau(
       List<SuitedCard> cards, int fromColumn, int toColumn) {
@@ -621,6 +720,7 @@ class FreeCell extends HookConsumerWidget {
       onUndo: state.value.history.isEmpty
           ? null
           : () => state.value = state.value.withUndo(),
+      onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
       onVictory: () => ref
           .read(achievementServiceProvider)

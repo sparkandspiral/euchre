@@ -70,4 +70,3 @@ class _RewardedAdDialogState extends State<_RewardedAdDialog>
     );
   }
 }
-

@@ -7,9 +7,11 @@ import 'package:equatable/equatable.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/immutable_history.dart';
+import 'package:solitaire/model/hint.dart';
 import 'package:solitaire/services/audio_service.dart';
 import 'package:solitaire/styles/playing_card_builder.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
+import 'package:solitaire/utils/card_description.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
 import 'package:utils/utils.dart';
@@ -243,6 +245,63 @@ class PyramidSolitaireState {
         stock: stock.sublist(0, stock.length - 1), waste: waste + [stock.last]);
   }
 
+  HintSuggestion? findHint() {
+    final exposedPositions = <PyramidCardPos>[];
+    for (var row = 0; row < pyramid.length; row++) {
+      for (var col = 0; col < pyramid[row].length; col++) {
+        if (isExposed(row, col)) {
+          exposedPositions.add(PyramidCardPos(row, col));
+        }
+      }
+    }
+
+    for (final pos in exposedPositions) {
+      final card = pyramid[pos.row][pos.col];
+      if (canRemoveKing(card)) {
+        return HintSuggestion(
+          message:
+              'Remove the king ${describeCard(card.card)} at ${describeRowPosition(pos.row, pos.col)}.',
+        );
+      }
+    }
+
+    for (var i = 0; i < exposedPositions.length; i++) {
+      for (var j = i + 1; j < exposedPositions.length; j++) {
+        final aPos = exposedPositions[i];
+        final bPos = exposedPositions[j];
+        final cardA = pyramid[aPos.row][aPos.col];
+        final cardB = pyramid[bPos.row][bPos.col];
+        if (canRemovePair(cardA, cardB)) {
+          return HintSuggestion(
+            message:
+                'Pair ${describeCard(cardA.card)} at ${describeRowPosition(aPos.row, aPos.col)} with ${describeCard(cardB.card)} at ${describeRowPosition(bPos.row, bPos.col)}.',
+          );
+        }
+      }
+    }
+
+    final wasteCard = waste.lastOrNull;
+    if (wasteCard != null) {
+      for (final pos in exposedPositions) {
+        final pyramidCard = pyramid[pos.row][pos.col];
+        if (canRemovePair(pyramidCard, wasteCard)) {
+          return HintSuggestion(
+            message:
+                'Match ${describeCard(pyramidCard.card)} at ${describeRowPosition(pos.row, pos.col)} with the waste card ${describeCard(wasteCard.card)}.',
+          );
+        }
+      }
+    }
+
+    if (canDraw) {
+      return const HintSuggestion(
+        message: 'Draw a new waste card from the stock.',
+      );
+    }
+
+    return null;
+  }
+
   PyramidSolitaireState withUndo() =>
       history.last.copyWith(saveNewStateToHistory: false, usedUndo: true);
 
@@ -341,6 +400,7 @@ class PyramidSolitaire extends HookConsumerWidget {
       onUndo: state.value.history.isEmpty
           ? null
           : () => state.value = state.value.withUndo(),
+      onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
       // No per-game achievement checks for Pyramid currently; global checks handled by CardScaffold
       builder: (context, constraints, cardBack, autoMoveEnabled, gameKey) {

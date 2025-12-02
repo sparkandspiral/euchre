@@ -8,10 +8,12 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/immutable_history.dart';
+import 'package:solitaire/model/hint.dart';
 import 'package:solitaire/services/achievement_service.dart';
 import 'package:solitaire/services/audio_service.dart';
 import 'package:solitaire/styles/playing_card_style.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
+import 'package:solitaire/utils/card_description.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
 import 'package:utils/utils.dart';
@@ -165,6 +167,34 @@ class TriPeaksSolitaireState {
         history: history.push(this),
       );
 
+  HintSuggestion? findHint() {
+    final wasteCard = waste.lastOrNull;
+    for (int row = 0; row < tableau.length; row++) {
+      for (int col = 0; col < tableau[row].length; col++) {
+        final card = tableau[row][col];
+        if (card == null || !isCardExposed(row, col) || !canSelect(card)) {
+          continue;
+        }
+
+        final target = wasteCard == null
+            ? 'start the waste pile'
+            : 'play on ${describeCard(wasteCard)}';
+        return HintSuggestion(
+          message:
+              'Play ${describeCard(card)} from ${describeRowPosition(row, col)} to $target.',
+        );
+      }
+    }
+
+    if (canDraw) {
+      return const HintSuggestion(
+        message: 'Draw a card from the stock to refresh the waste pile.',
+      );
+    }
+
+    return null;
+  }
+
   TriPeaksSolitaireState withUndo() => history.last;
 
   bool get isVictory =>
@@ -258,6 +288,7 @@ class TriPeaksSolitaire extends HookConsumerWidget {
       onUndo: state.value.history.isEmpty
           ? null
           : () => state.value = state.value.withUndo(),
+      onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
       onTutorial: startTutorial,
       onVictory: () => ref

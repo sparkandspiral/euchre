@@ -7,12 +7,14 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/immutable_history.dart';
+import 'package:solitaire/model/hint.dart';
 import 'package:solitaire/services/achievement_service.dart';
 import 'package:solitaire/services/audio_service.dart';
 // Removed playing_card_style import - custom CardGameStyle is provided here
 import 'package:solitaire/styles/playing_card_builder.dart';
 import 'package:solitaire/utils/axis_extensions.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
+import 'package:solitaire/utils/card_description.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
 import 'package:utils/utils.dart';
@@ -286,6 +288,80 @@ class SpiderSolitaireState {
     return null;
   }
 
+  HintSuggestion? findHint() {
+    HintSuggestion? bestHint;
+    var bestScore = -1;
+
+    for (int column = 0; column < revealedCards.length; column++) {
+      final columnCards = revealedCards[column];
+      for (int start = 0; start < columnCards.length; start++) {
+        final moving = columnCards.sublist(start);
+        if (!isValidSequence(moving)) {
+          continue;
+        }
+
+        for (int target = 0; target < revealedCards.length; target++) {
+          if (target == column) continue;
+          if (!canMoveToColumn(moving, target)) continue;
+
+          final targetTop = revealedCards[target].lastOrNull;
+          final targetDescription = targetTop == null
+              ? 'empty ${describeColumn(target)}'
+              : '${describeCard(targetTop.card)} in ${describeColumn(target)}';
+          final cardsDescription =
+              describeCardSequence(moving.map((c) => c.card).toList());
+          final revealsHidden = start == 0 &&
+              moving.length == columnCards.length &&
+              hiddenCards[column].isNotEmpty;
+          final keepsSuit = isValidSuitSequence(moving);
+
+          final detailParts = <String>[];
+          if (keepsSuit) {
+            detailParts.add(
+                'Keeps a ${describeSuitName(moving.first.suit)} run together.');
+          }
+          if (revealsHidden) {
+            detailParts.add('Reveals a hidden card.');
+          }
+
+          final hint = HintSuggestion(
+            message:
+                'Move $cardsDescription from ${describeColumn(column)} onto $targetDescription.',
+            detail: detailParts.isEmpty ? null : detailParts.join(' '),
+          );
+
+          final score =
+              (revealsHidden ? 4 : 0) + (keepsSuit ? 2 : 0) + moving.length;
+          if (score > bestScore) {
+            bestScore = score;
+            bestHint = hint;
+          }
+          if (revealsHidden && keepsSuit) {
+            return hint;
+          }
+        }
+      }
+    }
+
+    if (bestHint != null) {
+      return bestHint;
+    }
+
+    if (canDeal) {
+      return const HintSuggestion(
+        message: 'Deal one card to each column from the stock.',
+      );
+    }
+
+    if (stock.isNotEmpty && revealedCards.any((column) => column.isEmpty)) {
+      return const HintSuggestion(
+        message: 'Fill every column before dealing from the stock.',
+      );
+    }
+
+    return null;
+  }
+
   SpiderSolitaireState withUndo() {
     return history.last.copyWith(saveNewStateToHistory: false, usedUndo: true);
   }
@@ -395,6 +471,7 @@ class SpiderSolitaire extends HookConsumerWidget {
       onUndo: state.value.history.isEmpty
           ? null
           : () => state.value = state.value.withUndo(),
+      onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
       onVictory: () => ref
           .read(achievementServiceProvider)

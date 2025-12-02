@@ -9,12 +9,14 @@ import 'package:solitaire/group/exposed_deck.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/immutable_history.dart';
+import 'package:solitaire/model/hint.dart';
 import 'package:solitaire/services/achievement_service.dart';
 import 'package:solitaire/services/audio_service.dart';
 import 'package:solitaire/styles/playing_card_asset_bundle_cache.dart';
 import 'package:solitaire/styles/playing_card_style.dart';
 import 'package:solitaire/utils/axis_extensions.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
+import 'package:solitaire/utils/card_description.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/delayed_auto_move_listener.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
@@ -227,6 +229,121 @@ class SolitaireState {
             newColumnCard.suit.color != topMostCard.suit.color);
   }
 
+  bool _isDescendingAlternating(List<SuitedCard> cards) {
+    if (cards.length <= 1) {
+      return true;
+    }
+
+    for (var i = 0; i < cards.length - 1; i++) {
+      final current = cards[i];
+      final next = cards[i + 1];
+      if (getCardValue(current) != getCardValue(next) + 1 ||
+          current.suit.color == next.suit.color) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  HintSuggestion? findHint() {
+    HintSuggestion describeFoundationMove(int column, SuitedCard card) {
+      return HintSuggestion(
+        message:
+            'Move ${describeCard(card)} from ${describeColumn(column)} to the ${describeSuitName(card.suit)} foundation.',
+      );
+    }
+
+    for (int column = 0; column < revealedCards.length; column++) {
+      final card = revealedCards[column].lastOrNull;
+      if (card != null && canComplete(card)) {
+        return describeFoundationMove(column, card);
+      }
+    }
+
+    final wasteCard = revealedDeck.lastOrNull;
+    if (wasteCard != null && canComplete(wasteCard)) {
+      return HintSuggestion(
+        message:
+            'Move ${describeCard(wasteCard)} from the waste pile to the ${describeSuitName(wasteCard.suit)} foundation.',
+      );
+    }
+
+    if (wasteCard != null) {
+      for (int column = 0; column < revealedCards.length; column++) {
+        if (canMove([wasteCard], column)) {
+          final targetTop = revealedCards[column].lastOrNull;
+          final targetDescription = targetTop == null
+              ? 'empty ${describeColumn(column)}'
+              : '${describeCard(targetTop)} in ${describeColumn(column)}';
+          return HintSuggestion(
+            message:
+                'Play ${describeCard(wasteCard)} from the waste pile onto $targetDescription.',
+          );
+        }
+      }
+    }
+
+    HintSuggestion? bestMove;
+    var bestRevealsHidden = false;
+
+    for (int from = 0; from < revealedCards.length; from++) {
+      final columnCards = revealedCards[from];
+      for (int startIndex = 0; startIndex < columnCards.length; startIndex++) {
+        final moving = columnCards.sublist(startIndex);
+        if (!_isDescendingAlternating(moving)) {
+          continue;
+        }
+
+        for (int target = 0; target < revealedCards.length; target++) {
+          if (target == from) continue;
+          if (!canMove(moving, target)) continue;
+
+          final targetTop = revealedCards[target].lastOrNull;
+          final targetDescription = targetTop == null
+              ? 'empty ${describeColumn(target)}'
+              : '${describeCard(targetTop)} in ${describeColumn(target)}';
+          final revealsHidden = startIndex == 0 &&
+              moving.length == columnCards.length &&
+              hiddenCards[from].isNotEmpty;
+
+          final hint = HintSuggestion(
+            message:
+                'Move ${describeCardSequence(moving)} from ${describeColumn(from)} onto $targetDescription.',
+            detail: revealsHidden ? 'This move reveals a hidden card.' : null,
+          );
+
+          if (revealsHidden) {
+            return hint;
+          }
+
+          if (bestMove == null || !bestRevealsHidden) {
+            bestMove = hint;
+            bestRevealsHidden = revealsHidden;
+          }
+        }
+      }
+    }
+
+    if (bestMove != null) {
+      return bestMove;
+    }
+
+    if (deck.isNotEmpty) {
+      return const HintSuggestion(
+        message: 'Tap the draw pile to reveal more cards.',
+      );
+    }
+
+    if (deck.isEmpty && revealedDeck.isNotEmpty) {
+      return const HintSuggestion(
+        message: 'Recycle the waste pile to keep the game going.',
+      );
+    }
+
+    return null;
+  }
+
   SolitaireState withMove(
       List<SuitedCard> cards, dynamic oldColumn, int newColumn) {
     return oldColumn == 'revealed-deck'
@@ -436,6 +553,7 @@ class Solitaire extends HookConsumerWidget {
       onUndo: state.value.history.isEmpty
           ? null
           : () => state.value = state.value.withUndo(),
+      onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
       onVictory: () => ref
           .read(achievementServiceProvider)

@@ -6,11 +6,13 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/immutable_history.dart';
+import 'package:solitaire/model/hint.dart';
 import 'package:solitaire/services/achievement_service.dart';
 import 'package:solitaire/services/audio_service.dart';
 import 'package:solitaire/styles/playing_card_style.dart';
 import 'package:solitaire/utils/axis_extensions.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
+import 'package:solitaire/utils/card_description.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
 import 'package:utils/utils.dart';
@@ -87,6 +89,34 @@ class GolfSolitaireState {
         canRollover: canRollover,
         history: history.push(this),
       );
+
+  HintSuggestion? findHint() {
+    final foundation = completedCards.lastOrNull;
+    final foundationDescription = foundation == null
+        ? 'the foundation'
+        : '${describeCard(foundation)} on the foundation';
+
+    for (int column = 0; column < cards.length; column++) {
+      final card = cards[column].lastOrNull;
+      if (card != null && canSelect(card)) {
+        final source = describeColumn(column);
+        final target = foundation == null
+            ? 'to start the foundation'
+            : 'onto $foundationDescription';
+        return HintSuggestion(
+          message: 'Play ${describeCard(card)} from $source $target.',
+        );
+      }
+    }
+
+    if (canDraw) {
+      return const HintSuggestion(
+        message: 'Draw a new card to refresh the foundation.',
+      );
+    }
+
+    return null;
+  }
 
   GolfSolitaireState withUndo() => history.last;
 
@@ -165,6 +195,7 @@ class GolfSolitaire extends HookConsumerWidget {
       onUndo: state.value.history.isEmpty
           ? null
           : () => state.value = state.value.withUndo(),
+      onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
       onTutorial: startTutorial,
       onVictory: () => ref

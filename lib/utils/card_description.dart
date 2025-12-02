@@ -46,4 +46,3 @@ String describeFreeCell(int index) => 'free cell ${index + 1}';
 
 String describeRowPosition(int row, int column) =>
     'row ${row + 1}, card ${column + 1}';
-

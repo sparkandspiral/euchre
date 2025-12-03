@@ -460,7 +460,9 @@ class SolitaireState {
     bool? canAutoMove,
     bool saveNewStateToHistory = true,
   }) {
-    final nextHistory = saveNewStateToHistory ? history.push(this) : history;
+    final nextHistory = saveNewStateToHistory
+        ? history.pushCapped(this, maxLength: kDefaultHistoryLimit)
+        : history;
 
     return SolitaireState(
       hiddenCards: hiddenCards ?? this.hiddenCards,

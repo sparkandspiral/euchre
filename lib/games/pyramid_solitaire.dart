@@ -317,7 +317,9 @@ class PyramidSolitaireState {
     bool clearSelected = false,
     bool saveNewStateToHistory = true,
   }) {
-    final nextHistory = saveNewStateToHistory ? history.push(this) : history;
+    final nextHistory = saveNewStateToHistory
+        ? history.pushCapped(this, maxLength: kDefaultHistoryLimit)
+        : history;
 
     return PyramidSolitaireState(
       pyramid: pyramid ?? this.pyramid,

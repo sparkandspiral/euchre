@@ -1,6 +1,7 @@
 import 'package:card_game/card_game.dart';
 import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -226,7 +227,7 @@ class SpiderSolitaireState {
         completedSequences: newCompletedSequences,
         suitCount: suitCount,
         usedUndo: usedUndo,
-        history: history.push(this),
+        history: history.pushCapped(this, maxLength: kDefaultHistoryLimit),
       );
     }
 
@@ -379,7 +380,9 @@ class SpiderSolitaireState {
     bool? usedUndo,
     bool saveNewStateToHistory = true,
   }) {
-    final nextHistory = saveNewStateToHistory ? history.push(this) : history;
+    final nextHistory = saveNewStateToHistory
+        ? history.pushCapped(this, maxLength: kDefaultHistoryLimit)
+        : history;
 
     return SpiderSolitaireState(
       hiddenCards: hiddenCards ?? this.hiddenCards,
@@ -528,6 +531,10 @@ class SpiderSolitaire extends HookConsumerWidget {
           ],
         );
 
+        final animationDuration =
+            kIsWeb ? Duration.zero : Duration(milliseconds: 300);
+        final animationCurve = kIsWeb ? Curves.linear : Curves.easeInOutCubic;
+
         return CardGame<SpiderCard, dynamic>(
           gameKey: gameKey,
           style: CardGameStyle<SpiderCard, dynamic>(
@@ -535,8 +542,8 @@ class SpiderSolitaire extends HookConsumerWidget {
             emptyGroupBuilder: (group, state) => Stack(
               children: [
                 AnimatedContainer(
-                  duration: Duration(milliseconds: 300),
-                  curve: Curves.easeInOutCubic,
+                  duration: animationDuration,
+                  curve: animationCurve,
                   decoration: BoxDecoration(
                     color: switch (state) {
                       CardState.regular => Colors.white,
@@ -551,8 +558,8 @@ class SpiderSolitaire extends HookConsumerWidget {
             ),
             cardBuilder: (value, group, flipped, cardState) =>
                 AnimatedFlippable(
-              duration: Duration(milliseconds: 300),
-              curve: Curves.easeInOutCubic,
+              duration: animationDuration,
+              curve: animationCurve,
               isFlipped: flipped,
               front: Stack(
                 fit: StackFit.expand,
@@ -561,8 +568,8 @@ class SpiderSolitaire extends HookConsumerWidget {
                   Center(
                     child: AnimatedContainer(
                       margin: EdgeInsets.all(2),
-                      duration: Duration(milliseconds: 300),
-                      curve: Curves.easeInOutCubic,
+                      duration: animationDuration,
+                      curve: animationCurve,
                       decoration: BoxDecoration(
                         color: switch (cardState) {
                           CardState.regular => null,

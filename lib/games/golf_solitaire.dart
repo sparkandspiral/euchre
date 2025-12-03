@@ -76,7 +76,7 @@ class GolfSolitaireState {
         completedCards: completedCards + [card],
         chain: chain + 1,
         canRollover: canRollover,
-        history: history.push(this),
+        history: history.pushCapped(this, maxLength: kDefaultHistoryLimit),
       );
 
   bool get canDraw => deck.isNotEmpty;
@@ -87,7 +87,7 @@ class GolfSolitaireState {
         completedCards: completedCards + [deck.last],
         chain: 0,
         canRollover: canRollover,
-        history: history.push(this),
+        history: history.pushCapped(this, maxLength: kDefaultHistoryLimit),
       );
 
   HintSuggestion? findHint() {

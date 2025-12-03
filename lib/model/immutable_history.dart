@@ -1,3 +1,5 @@
+const int kDefaultHistoryLimit = 256;
+
 class ImmutableHistory<T> extends Iterable<T> {
   final _HistoryNode<T>? _tail;
   final int _length;
@@ -8,6 +10,27 @@ class ImmutableHistory<T> extends Iterable<T> {
 
   ImmutableHistory<T> push(T value) =>
       ImmutableHistory._(_HistoryNode(value, _tail), _length + 1);
+
+  ImmutableHistory<T> pushCapped(T value, {required int maxLength}) {
+    if (maxLength <= 0) {
+      return const ImmutableHistory.empty();
+    }
+
+    final values = <T>[value];
+    var node = _tail;
+
+    while (node != null && values.length < maxLength) {
+      values.add(node.value);
+      node = node.previous;
+    }
+
+    _HistoryNode<T>? newTail;
+    for (var i = values.length - 1; i >= 0; i--) {
+      newTail = _HistoryNode(values[i], newTail);
+    }
+
+    return ImmutableHistory._(newTail, values.length);
+  }
 
   ImmutableHistory<T> pop() {
     if (_tail == null) {

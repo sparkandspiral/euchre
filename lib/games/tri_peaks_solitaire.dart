@@ -151,7 +151,7 @@ class TriPeaksSolitaireState {
       streak: newStreak,
       longestStreak: newStreak > longestStreak ? newStreak : longestStreak,
       canRollover: canRollover,
-      history: history.push(this),
+      history: history.pushCapped(this, maxLength: kDefaultHistoryLimit),
     );
   }
 
@@ -164,7 +164,7 @@ class TriPeaksSolitaireState {
         streak: 0,
         longestStreak: longestStreak,
         canRollover: canRollover,
-        history: history.push(this),
+        history: history.pushCapped(this, maxLength: kDefaultHistoryLimit),
       );
 
   HintSuggestion? findHint() {

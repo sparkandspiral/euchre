@@ -1,4 +1,5 @@
 import 'package:card_game/card_game.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:solitaire/model/card_back.dart';
 import 'package:solitaire/styles/playing_card_builder.dart';
@@ -12,10 +13,11 @@ CardGameStyle<SuitedCard, G> playingCardStyle<G>({
       cardSize: Size(69, 93) * sizeMultiplier,
       emptyGroupBuilder: (group, state) => Stack(
         children: [
-          if (emptyGroupOverlayBuilder?.call(group) case final overlay?) Center(child: overlay),
+          if (emptyGroupOverlayBuilder?.call(group) case final overlay?)
+            Center(child: overlay),
           AnimatedContainer(
-            duration: Duration(milliseconds: 300),
-            curve: Curves.easeInOutCubic,
+            duration: kIsWeb ? Duration.zero : Duration(milliseconds: 300),
+            curve: kIsWeb ? Curves.linear : Curves.easeInOutCubic,
             decoration: BoxDecoration(
               color: switch (state) {
                 CardState.regular => Colors.white,
@@ -29,8 +31,8 @@ CardGameStyle<SuitedCard, G> playingCardStyle<G>({
         ],
       ),
       cardBuilder: (value, group, flipped, cardState) => AnimatedFlippable(
-        duration: Duration(milliseconds: 300),
-        curve: Curves.easeInOutCubic,
+        duration: kIsWeb ? Duration.zero : Duration(milliseconds: 300),
+        curve: kIsWeb ? Curves.linear : Curves.easeInOutCubic,
         isFlipped: flipped,
         front: Stack(
           fit: StackFit.expand,
@@ -39,12 +41,13 @@ CardGameStyle<SuitedCard, G> playingCardStyle<G>({
             Center(
               child: AnimatedContainer(
                 margin: EdgeInsets.all(2),
-                duration: Duration(milliseconds: 300),
-                curve: Curves.easeInOutCubic,
+                duration: kIsWeb ? Duration.zero : Duration(milliseconds: 300),
+                curve: kIsWeb ? Curves.linear : Curves.easeInOutCubic,
                 decoration: BoxDecoration(
                   color: switch (cardState) {
                     CardState.regular => null,
-                    CardState.highlighted => Color(0xFF9FC7FF).withValues(alpha: 0.5),
+                    CardState.highlighted =>
+                      Color(0xFF9FC7FF).withValues(alpha: 0.5),
                     CardState.error => Color(0xFFFFADAD).withValues(alpha: 0.5),
                   },
                   borderRadius: BorderRadius.circular(12),

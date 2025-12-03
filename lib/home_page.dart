@@ -233,20 +233,12 @@ class HomePage extends ConsumerWidget {
                 gradient: gameGradients[game]!,
                 icon: getGameIcon(game),
                 logoAsset: gameLogos[game]!,
-                defaultDifficulty: difficulty,
                 onSelectDifficulty: () => _showDifficultySelector(
                   rootContext: context,
                   ref: ref,
                   game: game,
                   builder: builder,
                   currentDefault: difficulty,
-                ),
-                onQuickStart: () => _startGame(
-                  context: context,
-                  ref: ref,
-                  game: game,
-                  builder: builder,
-                  difficulty: difficulty,
                 ),
               );
             },
@@ -262,18 +254,14 @@ class _GameCard extends StatelessWidget {
   final List<Color> gradient;
   final IconData icon;
   final String logoAsset;
-  final Difficulty defaultDifficulty;
   final VoidCallback onSelectDifficulty;
-  final VoidCallback onQuickStart;
 
   const _GameCard({
     required this.game,
     required this.gradient,
     required this.icon,
     required this.logoAsset,
-    required this.defaultDifficulty,
     required this.onSelectDifficulty,
-    required this.onQuickStart,
   });
 
   @override
@@ -344,17 +332,6 @@ class _GameCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          Tooltip(
-                            message: 'Quick start (${defaultDifficulty.title})',
-                            child: IconButton(
-                              onPressed: onQuickStart,
-                              icon: Icon(
-                                Icons.play_circle_fill_rounded,
-                                color: Colors.white,
-                                size: 26,
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                       Spacer(),
@@ -371,36 +348,6 @@ class _GameCard extends StatelessWidget {
                         ),
                       ),
                       Spacer(),
-                      Align(
-                        alignment: Alignment.bottomLeft,
-                        child: Container(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.bolt,
-                                size: 14,
-                                color: Colors.white70,
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                'Default: ${defaultDifficulty.title}',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),

@@ -631,7 +631,9 @@ class FreeCellState {
     bool? canAutoMove,
     bool saveNewStateToHistory = true,
   }) {
-    final nextHistory = saveNewStateToHistory ? history.push(this) : history;
+    final nextHistory = saveNewStateToHistory
+        ? history.pushCapped(this, maxLength: kDefaultHistoryLimit)
+        : history;
 
     return FreeCellState(
       tableauCards: tableauCards ?? this.tableauCards,

@@ -597,8 +597,6 @@ class _InGameMenuSheet extends StatelessWidget {
             title: 'Close Game',
             description: 'Leave the table and return to the home screen.',
             onTap: onClose,
-            highlight: true,
-            highlightColor: Colors.redAccent,
             trailing: Icon(
               Icons.home_outlined,
               color: Colors.white54,

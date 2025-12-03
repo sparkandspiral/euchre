@@ -299,14 +299,14 @@ class TriPeaksSolitaire extends HookConsumerWidget {
         final axis = constraints.largestAxis;
         final minSize = constraints.smallest.longestSide;
         final spacing = minSize / 100;
-        final maxRows = axis == Axis.vertical ? 9.0 : 6.0;
-        final maxCols = axis == Axis.vertical ? 9.8 : 13.0;
+        final maxRows = axis == Axis.vertical ? 7.4 : 6.0;
+        final maxCols = axis == Axis.vertical ? 9.0 : 13.0;
 
         double sizeMultiplier;
         final verticalMultiplier =
             ((constraints.maxHeight - (maxRows - 1) * spacing) / maxRows) / 93;
-        final horizontalGap = axis == Axis.vertical ? spacing * 0.4 : spacing;
-        final outerMargin = axis == Axis.vertical ? spacing * 0.8 : spacing;
+        final horizontalGap = axis == Axis.vertical ? 1.0 : spacing;
+        final outerMargin = axis == Axis.vertical ? spacing * 0.25 : spacing;
 
         if (axis == Axis.vertical) {
           final availableWidth =
@@ -325,7 +325,7 @@ class TriPeaksSolitaire extends HookConsumerWidget {
         final cardWidth = 69 * sizeMultiplier;
         final cardHeight = 93 * sizeMultiplier;
         final cardSpacingX = cardWidth + horizontalGap;
-        final rowStep = cardHeight * 0.58;
+        final rowStep = cardHeight * 0.55;
 
         // Build a single card widget
         Widget buildCard(int row, int col) {

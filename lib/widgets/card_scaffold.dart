@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:adaptive_action_sheet/adaptive_action_sheet.dart';
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -22,6 +21,7 @@ import 'package:solitaire/utils/build_context_extensions.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
 import 'package:solitaire/utils/duration_extensions.dart';
 import 'package:utils/utils.dart';
+import 'package:solitaire/widgets/themed_sheet.dart';
 
 class CardScaffold extends HookConsumerWidget {
   final Game game;
@@ -123,6 +123,35 @@ class CardScaffold extends HookConsumerWidget {
     void closeGame() {
       ref.read(saveStateNotifierProvider.notifier).saveGameCloseOrRestart();
       context.pushReplacement(() => HomePage());
+    }
+
+    Future<void> openMenu() async {
+      if (!context.mounted) return;
+
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) => _InGameMenuSheet(
+          gameTitle: game.title,
+          onTutorial: () {
+            Navigator.of(sheetContext).pop();
+            onTutorial();
+          },
+          onNewGame: () {
+            Navigator.of(sheetContext).pop();
+            startNewGame();
+          },
+          onRestart: () {
+            Navigator.of(sheetContext).pop();
+            restartGame();
+          },
+          onClose: () {
+            Navigator.of(sheetContext).pop();
+            closeGame();
+          },
+        ),
+      );
     }
 
     Future<bool> promptForHintRefill() async {
@@ -302,42 +331,13 @@ class CardScaffold extends HookConsumerWidget {
                                   children: [
                                     Tooltip(
                                       message: 'Menu',
-                                      child: MenuAnchor(
-                                        builder: (context, controller, child) {
-                                          return ElevatedButton(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.white
-                                                  .withValues(alpha: 0.5),
-                                            ),
-                                            onPressed: () => controller.open(),
-                                            child: Icon(Icons.menu),
-                                          );
-                                        },
-                                        menuChildren: [
-                                          MenuItemButton(
-                                            leadingIcon:
-                                                Icon(Icons.star_border),
-                                            onPressed: startNewGame,
-                                            child: Text('New Game'),
-                                          ),
-                                          MenuItemButton(
-                                            leadingIcon:
-                                                Icon(Icons.restart_alt),
-                                            onPressed: restartGame,
-                                            child: Text('Restart Game'),
-                                          ),
-                                          MenuItemButton(
-                                            leadingIcon:
-                                                Icon(Icons.question_mark),
-                                            onPressed: onTutorial,
-                                            child: Text('Tutorial'),
-                                          ),
-                                          MenuItemButton(
-                                            leadingIcon: Icon(Icons.close),
-                                            onPressed: closeGame,
-                                            child: Text('Close'),
-                                          ),
-                                        ],
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.white
+                                              .withValues(alpha: 0.5),
+                                        ),
+                                        onPressed: openMenu,
+                                        child: Icon(Icons.menu),
                                       ),
                                     ),
                                     Tooltip(
@@ -419,48 +419,7 @@ class CardScaffold extends HookConsumerWidget {
                                         style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.white
                                                 .withValues(alpha: 0.5)),
-                                        onPressed: () async {
-                                          await showAdaptiveActionSheet(
-                                            context: context,
-                                            actions: [
-                                              BottomSheetAction(
-                                                title: Text('New Game'),
-                                                leading:
-                                                    Icon(Icons.star_border),
-                                                onPressed: (context) {
-                                                  startNewGame();
-                                                  Navigator.of(context).pop();
-                                                },
-                                              ),
-                                              BottomSheetAction(
-                                                title: Text('Restart Game'),
-                                                leading:
-                                                    Icon(Icons.restart_alt),
-                                                onPressed: (_) {
-                                                  restartGame();
-                                                  Navigator.of(context).pop();
-                                                },
-                                              ),
-                                              BottomSheetAction(
-                                                title: Text('Tutorial'),
-                                                leading:
-                                                    Icon(Icons.question_mark),
-                                                onPressed: (_) {
-                                                  onTutorial();
-                                                  Navigator.of(context).pop();
-                                                },
-                                              ),
-                                              BottomSheetAction(
-                                                title: Text('Close'),
-                                                leading: Icon(Icons.close),
-                                                onPressed: (_) {
-                                                  Navigator.of(context).pop();
-                                                  closeGame();
-                                                },
-                                              ),
-                                            ],
-                                          );
-                                        },
+                                        onPressed: openMenu,
                                         child: Icon(Icons.menu),
                                       ),
                                     ),
@@ -588,6 +547,66 @@ class CardScaffold extends HookConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _InGameMenuSheet extends StatelessWidget {
+  final String gameTitle;
+  final VoidCallback onTutorial;
+  final VoidCallback onNewGame;
+  final VoidCallback onRestart;
+  final VoidCallback onClose;
+
+  const _InGameMenuSheet({
+    required this.gameTitle,
+    required this.onTutorial,
+    required this.onNewGame,
+    required this.onRestart,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ThemedSheet(
+      title: '$gameTitle Menu',
+      subtitle: 'Choose an action for your current game.',
+      child: Column(
+        children: [
+          SheetOptionTile(
+            icon: Icons.school,
+            title: 'Tutorial',
+            description:
+                'Replay the guided walkthrough to refresh the core mechanics.',
+            onTap: onTutorial,
+          ),
+          SheetOptionTile(
+            icon: Icons.star_border,
+            title: 'New Game',
+            description: 'Deal a fresh layout with newly shuffled cards.',
+            onTap: onNewGame,
+          ),
+          SheetOptionTile(
+            icon: Icons.restart_alt,
+            title: 'Restart Game',
+            description: 'Reset this deal back to the starting position.',
+            onTap: onRestart,
+          ),
+          SheetOptionTile(
+            icon: Icons.close,
+            title: 'Close Game',
+            description: 'Leave the table and return to the home screen.',
+            onTap: onClose,
+            highlight: true,
+            highlightColor: Colors.redAccent,
+            trailing: Icon(
+              Icons.home_outlined,
+              color: Colors.white54,
+              size: 20,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

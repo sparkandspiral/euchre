@@ -15,6 +15,7 @@ import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/providers/save_state_notifier.dart';
 import 'package:solitaire/utils/build_context_extensions.dart';
+import 'package:solitaire/widgets/themed_sheet.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -113,39 +114,22 @@ class HomePage extends ConsumerWidget {
     required Widget Function(Difficulty, bool) builder,
     required Difficulty currentDefault,
   }) {
-    final notifier = ref.read(saveStateNotifierProvider.notifier);
-    var selectedDifficulty = currentDefault;
-    var defaultDifficulty = currentDefault;
-
     showModalBottomSheet(
       context: rootContext,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (innerContext, setState) {
-            return _DifficultySheet(
+        return _DifficultySheet(
+          game: game,
+          defaultDifficulty: currentDefault,
+          onDifficultyChosen: (difficulty) {
+            Navigator.of(sheetContext).pop();
+            _startGame(
+              context: rootContext,
+              ref: ref,
               game: game,
-              selectedDifficulty: selectedDifficulty,
-              defaultDifficulty: defaultDifficulty,
-              onSelectDifficulty: (difficulty) {
-                setState(() => selectedDifficulty = difficulty);
-              },
-              onDefaultChanged: (difficulty) async {
-                setState(() => defaultDifficulty = difficulty);
-                await notifier.saveDefaultDifficulty(
-                    game: game, difficulty: difficulty);
-              },
-              onPlay: () {
-                Navigator.of(sheetContext).pop();
-                _startGame(
-                  context: rootContext,
-                  ref: ref,
-                  game: game,
-                  builder: builder,
-                  difficulty: selectedDifficulty,
-                );
-              },
+              builder: builder,
+              difficulty: difficulty,
             );
           },
         );
@@ -362,243 +346,32 @@ class _GameCard extends StatelessWidget {
 
 class _DifficultySheet extends StatelessWidget {
   final Game game;
-  final Difficulty selectedDifficulty;
   final Difficulty defaultDifficulty;
-  final ValueChanged<Difficulty> onSelectDifficulty;
-  final ValueChanged<Difficulty> onDefaultChanged;
-  final VoidCallback onPlay;
+  final ValueChanged<Difficulty> onDifficultyChosen;
 
   const _DifficultySheet({
     required this.game,
-    required this.selectedDifficulty,
     required this.defaultDifficulty,
-    required this.onSelectDifficulty,
-    required this.onDefaultChanged,
-    required this.onPlay,
+    required this.onDifficultyChosen,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
-
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(bottom: bottomPadding),
-        child: SingleChildScrollView(
-          physics: BouncingScrollPhysics(),
-          child: Container(
-            margin: EdgeInsets.only(top: 8),
-            decoration: BoxDecoration(
-              color: Color(0xFF0A2340),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            padding: EdgeInsets.fromLTRB(24, 16, 24, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 48,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 18),
-                Text(
-                  game.title,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Choose a difficulty before you play.',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                ),
-                SizedBox(height: 24),
-                ...Difficulty.values.map(
-                  (difficulty) => _DifficultyOptionTile(
-                    game: game,
-                    difficulty: difficulty,
-                    isSelected: selectedDifficulty == difficulty,
-                    isDefault: defaultDifficulty == difficulty,
-                    onTap: () => onSelectDifficulty(difficulty),
-                    onSetDefault: () => onDefaultChanged(difficulty),
-                  ),
-                ),
-                SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: onPlay,
-                    child: Text('Play ${selectedDifficulty.title}'),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text('Cancel'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DifficultyOptionTile extends StatelessWidget {
-  final Game game;
-  final Difficulty difficulty;
-  final bool isSelected;
-  final bool isDefault;
-  final VoidCallback onTap;
-  final VoidCallback onSetDefault;
-
-  const _DifficultyOptionTile({
-    required this.game,
-    required this.difficulty,
-    required this.isSelected,
-    required this.isDefault,
-    required this.onTap,
-    required this.onSetDefault,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final titleStyle = TextStyle(
-      color: Colors.white,
-      fontSize: 16,
-      fontWeight: FontWeight.w600,
-    );
-
-    final descriptionStyle = TextStyle(
-      color: Colors.white70,
-      fontSize: 13,
-    );
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Color(0xFF132A4A),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isSelected
-                  ? Color(0xFFFFD700)
-                  : Colors.white.withValues(alpha: 0.08),
-              width: 1.4,
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  difficulty.icon,
-                  color: Colors.white,
-                  size: 20,
-                ),
+    return ThemedSheet(
+      title: game.title,
+      subtitle: 'Tap a difficulty to start playing immediately.',
+      child: Column(
+        children: Difficulty.values
+            .map(
+              (difficulty) => SheetOptionTile(
+                icon: difficulty.icon,
+                title: difficulty.title,
+                description: difficulty.getDescription(game),
+                onTap: () => onDifficultyChosen(difficulty),
+                highlight: defaultDifficulty == difficulty,
               ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(difficulty.title, style: titleStyle),
-                        SizedBox(width: 8),
-                        if (isSelected)
-                          _DifficultyBadge(
-                            label: 'Selected',
-                            color: Color(0xFFFFD700),
-                          ),
-                        if (isDefault)
-                          Padding(
-                            padding: EdgeInsets.only(left: 6),
-                            child: _DifficultyBadge(
-                              label: 'Default',
-                              color: Color(0xFF6BE5FF),
-                            ),
-                          ),
-                      ],
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      difficulty.getDescription(game),
-                      style: descriptionStyle,
-                    ),
-                  ],
-                ),
-              ),
-              Tooltip(
-                message: isDefault
-                    ? 'Quick start uses this difficulty'
-                    : 'Set as quick start default',
-                child: IconButton(
-                  onPressed: onSetDefault,
-                  splashRadius: 18,
-                  padding: EdgeInsets.zero,
-                  constraints: BoxConstraints(),
-                  icon: Icon(
-                    isDefault
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DifficultyBadge extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _DifficultyBadge({
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-        ),
+            )
+            .toList(),
       ),
     );
   }

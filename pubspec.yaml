@@ -10,7 +10,6 @@ dependencies:
   flutter:
     sdk: flutter
 
-  adaptive_action_sheet: ^2.0.3
   audioplayers: ^6.4.0
   card_game: ^2.0.0
   collection:

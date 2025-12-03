@@ -9,14 +9,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "80.0.0"
-  adaptive_action_sheet:
-    dependency: "direct main"
-    description:
-      name: adaptive_action_sheet
-      sha256: "35190411e7136a3c244d58accdf254ac7158eac38e57a62d85b0477a7988f1c5"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.3"
   analyzer:
     dependency: transitive
     description:
@@ -1085,14 +1077,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
-  universal_io:
-    dependency: transitive
-    description:
-      name: universal_io
-      sha256: "1722b2dcc462b4b2f3ee7d188dad008b6eb4c40bbd03a3de451d82c78bba9aad"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.2.2"
   url_launcher:
     dependency: "direct main"
     description:

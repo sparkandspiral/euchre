@@ -435,31 +435,6 @@ class TriPeaksSolitaire extends HookConsumerWidget {
           );
         }
 
-        final streakIndicator = state.value.streak > 0
-            ? Container(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.amber.withOpacity(0.4),
-                      blurRadius: 8,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Text(
-                  'Streak: ${state.value.streak}',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16 * sizeMultiplier,
-                  ),
-                ),
-              )
-            : null;
-
         final stockDeck = CardDeck<SuitedCard, dynamic>.flipped(
           key: stockKey,
           value: 'stock',
@@ -501,7 +476,6 @@ class TriPeaksSolitaire extends HookConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             spacing: spacing * 2,
             children: [
-              if (streakIndicator != null) streakIndicator,
               deckDisplay,
             ],
           );

@@ -300,18 +300,32 @@ class TriPeaksSolitaire extends HookConsumerWidget {
         final minSize = constraints.smallest.longestSide;
         final spacing = minSize / 100;
         final maxRows = axis == Axis.vertical ? 9.0 : 6.0;
-        final maxCols = axis == Axis.vertical ? 10.6 : 13.0;
+        final maxCols = axis == Axis.vertical ? 9.8 : 13.0;
 
-        final sizeMultiplier = constraints.findCardSizeMultiplier(
-          maxRows: maxRows,
-          maxCols: maxCols,
-          spacing: spacing,
-        );
+        double sizeMultiplier;
+        final verticalMultiplier =
+            ((constraints.maxHeight - (maxRows - 1) * spacing) / maxRows) / 93;
+        final horizontalGap = axis == Axis.vertical ? spacing * 0.4 : spacing;
+        final outerMargin = axis == Axis.vertical ? spacing * 0.8 : spacing;
+
+        if (axis == Axis.vertical) {
+          final availableWidth =
+              constraints.maxWidth - outerMargin * 2 - horizontalGap * 9;
+          final horizontalMultiplier =
+              availableWidth > 0 ? availableWidth / (69 * 10) : verticalMultiplier;
+          sizeMultiplier = min(horizontalMultiplier, verticalMultiplier);
+        } else {
+          sizeMultiplier = constraints.findCardSizeMultiplier(
+            maxRows: maxRows,
+            maxCols: maxCols,
+            spacing: spacing,
+          );
+        }
 
         final cardWidth = 69 * sizeMultiplier;
         final cardHeight = 93 * sizeMultiplier;
-        final peakSpacing = cardWidth * 0.45;
-        final spacingHalf = spacing * 0.5;
+        final cardSpacingX = cardWidth + horizontalGap;
+        final rowStep = cardHeight * 0.58;
 
         // Build a single card widget
         Widget buildCard(int row, int col) {
@@ -345,152 +359,78 @@ class TriPeaksSolitaire extends HookConsumerWidget {
           );
         }
 
-        // Build the three peaks layout with proper spacing
+        final tableauHeight = cardHeight + rowStep * 3;
+
+        // Build the three peaks layout with overlapping structure
         Widget buildTriPeaks() {
-          final row3Width = cardWidth * 10 + spacingHalf * 9;
-          final row2GroupWidth = cardWidth * 3 + spacingHalf * 2;
-          final row2Width = row2GroupWidth * 3 + peakSpacing * 2;
-          final row1PairWidth = cardWidth * 2 + spacingHalf;
-          final row1Width = row1PairWidth * 3 + (peakSpacing + cardWidth) * 2;
-          final row0Width = cardWidth * 3 + (peakSpacing + cardWidth * 2) * 2;
-          final tableauWidth =
-              [row3Width, row2Width, row1Width, row0Width].reduce(max);
+          final row3Lefts =
+              List<double>.generate(10, (i) => outerMargin + i * cardSpacingX);
+          final row3Centers =
+              row3Lefts.map((left) => left + cardWidth / 2).toList();
+
+          final row2Lefts = List<double>.generate(9, (i) {
+            final center = (row3Centers[i] + row3Centers[i + 1]) / 2;
+            return center - cardWidth / 2;
+          });
+          final row2Centers =
+              row2Lefts.map((left) => left + cardWidth / 2).toList();
+
+          final row1Lefts = List<double>.generate(6, (col) {
+            final peakGroup = col ~/ 2;
+            final posInPair = col % 2;
+            final baseIndex = peakGroup * 3;
+            final first = posInPair == 0 ? baseIndex : baseIndex + 1;
+            final second = posInPair == 0 ? baseIndex + 1 : baseIndex + 2;
+            final center = (row2Centers[first] + row2Centers[second]) / 2;
+            return center - cardWidth / 2;
+          });
+          final row1Centers =
+              row1Lefts.map((left) => left + cardWidth / 2).toList();
+
+          final row0Lefts = List<double>.generate(3, (col) {
+            final leftChild = col * 2;
+            final rightChild = col * 2 + 1;
+            final center =
+                (row1Centers[leftChild] + row1Centers[rightChild]) / 2;
+            return center - cardWidth / 2;
+          });
+
+          final rowTops = [
+            0.0,
+            rowStep,
+            rowStep * 2,
+            rowStep * 3,
+          ];
+
+          final rows = [
+            (row: 0, tops: rowTops[0], lefts: row0Lefts),
+            (row: 1, tops: rowTops[1], lefts: row1Lefts),
+            (row: 2, tops: rowTops[2], lefts: row2Lefts),
+            (row: 3, tops: rowTops[3], lefts: row3Lefts),
+          ];
+
+          final positionedCards = <Widget>[];
+          for (final entry in rows) {
+            for (var col = 0; col < entry.lefts.length; col++) {
+              positionedCards.add(
+                Positioned(
+                  top: entry.tops,
+                  left: entry.lefts[col],
+                  child: buildCard(entry.row, col),
+                ),
+              );
+            }
+          }
+
+          final tableauWidth = row3Lefts.last + cardWidth + outerMargin;
 
           return SizedBox(
             width: tableauWidth,
-            height: cardHeight * 4 + spacing * 3,
+            height: tableauHeight,
             key: tableauKey,
             child: Stack(
-              children: [
-                // Row 3 (bottom) - 10 cards
-                Positioned(
-                  top: cardHeight * 3 + spacing * 3,
-                  left: 0,
-                  right: 0,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.max,
-                    children: List.generate(10, (col) {
-                      return Padding(
-                        padding:
-                            EdgeInsets.only(left: col > 0 ? spacingHalf : 0),
-                        child: buildCard(3, col),
-                      );
-                    }),
-                  ),
-                ),
-                // Row 2 - 9 cards (3 groups of 3)
-                Positioned(
-                  top: cardHeight * 2 + spacing * 2,
-                  left: 0,
-                  right: 0,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.max,
-                    children: [
-                      // First peak group (3 cards)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: List.generate(3, (i) {
-                          return Padding(
-                            padding:
-                                EdgeInsets.only(left: i > 0 ? spacingHalf : 0),
-                            child: buildCard(2, i),
-                          );
-                        }),
-                      ),
-                      SizedBox(width: peakSpacing),
-                      // Second peak group (3 cards)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: List.generate(3, (i) {
-                          return Padding(
-                            padding:
-                                EdgeInsets.only(left: i > 0 ? spacingHalf : 0),
-                            child: buildCard(2, i + 3),
-                          );
-                        }),
-                      ),
-                      SizedBox(width: peakSpacing),
-                      // Third peak group (3 cards)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: List.generate(3, (i) {
-                          return Padding(
-                            padding:
-                                EdgeInsets.only(left: i > 0 ? spacingHalf : 0),
-                            child: buildCard(2, i + 6),
-                          );
-                        }),
-                      ),
-                    ],
-                  ),
-                ),
-                // Row 1 - 6 cards (3 groups of 2)
-                Positioned(
-                  top: cardHeight + spacing,
-                  left: 0,
-                  right: 0,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.max,
-                    children: [
-                      // First peak (2 cards)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: List.generate(2, (i) {
-                          return Padding(
-                            padding:
-                                EdgeInsets.only(left: i > 0 ? spacingHalf : 0),
-                            child: buildCard(1, i),
-                          );
-                        }),
-                      ),
-                      SizedBox(width: peakSpacing + cardWidth),
-                      // Second peak (2 cards)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: List.generate(2, (i) {
-                          return Padding(
-                            padding:
-                                EdgeInsets.only(left: i > 0 ? spacingHalf : 0),
-                            child: buildCard(1, i + 2),
-                          );
-                        }),
-                      ),
-                      SizedBox(width: peakSpacing + cardWidth),
-                      // Third peak (2 cards)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: List.generate(2, (i) {
-                          return Padding(
-                            padding:
-                                EdgeInsets.only(left: i > 0 ? spacingHalf : 0),
-                            child: buildCard(1, i + 4),
-                          );
-                        }),
-                      ),
-                    ],
-                  ),
-                ),
-                // Row 0 (peaks) - 3 cards
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.max,
-                    children: [
-                      buildCard(0, 0),
-                      SizedBox(width: peakSpacing + cardWidth * 2),
-                      buildCard(0, 1),
-                      SizedBox(width: peakSpacing + cardWidth * 2),
-                      buildCard(0, 2),
-                    ],
-                  ),
-                ),
-              ],
+              clipBehavior: Clip.none,
+              children: positionedCards,
             ),
           );
         }
@@ -567,6 +507,8 @@ class TriPeaksSolitaire extends HookConsumerWidget {
           );
         }
 
+        final deckGap = spacing + cardHeight * 0.1;
+
         return CardGame<SuitedCard, dynamic>(
           gameKey: gameKey,
           style: playingCardStyle(
@@ -589,13 +531,23 @@ class TriPeaksSolitaire extends HookConsumerWidget {
               Column(
                 children: [
                   Expanded(
-                    child: Align(
-                      alignment: Alignment.topCenter,
-                      child: buildTriPeaks(),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            height: tableauHeight,
+                            child: Align(
+                              alignment: Alignment.center,
+                              child: buildTriPeaks(),
+                            ),
+                          ),
+                          SizedBox(height: deckGap),
+                          buildPiles(),
+                        ],
+                      ),
                     ),
                   ),
-                  SizedBox(height: spacing * 2),
-                  buildPiles(),
                 ],
               ),
           ],

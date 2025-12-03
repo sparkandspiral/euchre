@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1078593702300",
+    "project_id": "cards-da774",
+    "storage_bucket": "cards-da774.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1078593702300:android:e61a514fd58b44ab786059",
+        "android_client_info": {
+          "package_name": "ca.sparkandspiral.dailysolitaire"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhFgPcgITGxFwLlTdPCHg87UfgwOxcBfw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

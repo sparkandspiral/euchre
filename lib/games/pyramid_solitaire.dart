@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:card_game/card_game.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
@@ -33,10 +35,8 @@ class PyramidCard extends Equatable {
 }
 
 class PyramidSolitaireState {
-  // 7 rows; row i has i+1 cards. Hidden shows covered cards beneath.
-  final List<List<PyramidCard>> pyramid;
-  final List<List<bool>>
-      hidden; // true means face-down (covered), false means revealed
+  // 7 rows; row i has i+1 cards. Null entries represent removed cards.
+  final List<List<PyramidCard?>> pyramid;
 
   final List<PyramidCard> stock; // draw pile
   final List<PyramidCard> waste; // exposed from stock (top playable)
@@ -47,7 +47,6 @@ class PyramidSolitaireState {
 
   PyramidSolitaireState({
     required this.pyramid,
-    required this.hidden,
     required this.stock,
     required this.waste,
     required this.history,
@@ -79,14 +78,11 @@ class PyramidSolitaireState {
     }
 
     // Build pyramid structure
-    final pyramid = <List<PyramidCard>>[];
-    final hidden = <List<bool>>[];
+    final pyramid = <List<PyramidCard?>>[];
     for (var r = 0; r < 7; r++) {
-      final row = deck.take(r + 1).toList();
+      final row = deck.take(r + 1).toList().map<PyramidCard?>((c) => c).toList();
       deck = deck.skip(r + 1).toList();
       pyramid.add(row);
-      // All cards start face-up in pyramid solitaire
-      hidden.add(List<bool>.filled(r + 1, false));
     }
 
     // Remaining deck -> stock; waste initially empty
@@ -99,7 +95,6 @@ class PyramidSolitaireState {
 
     return PyramidSolitaireState(
       pyramid: pyramid,
-      hidden: hidden,
       stock: deck,
       waste: waste,
       history: const ImmutableHistory.empty(),
@@ -108,7 +103,7 @@ class PyramidSolitaireState {
     );
   }
 
-  static bool _hasCard(List<List<PyramidCard>> pyramid, int row, int col) {
+  static bool _hasCard(List<List<PyramidCard?>> pyramid, int row, int col) {
     if (row < 0 || row >= pyramid.length) return false;
     if (col < 0 || col >= pyramid[row].length) return false;
     return true;
@@ -119,14 +114,21 @@ class PyramidSolitaireState {
 
   bool isExposed(int row, int col) {
     if (!_hasCard(pyramid, row, col)) return false;
-    return hidden[row][col] == false;
+    final card = pyramid[row][col];
+    if (card == null) return false;
+    if (row == pyramid.length - 1) return true;
+    final leftCovered =
+        _hasCard(pyramid, row + 1, col) && pyramid[row + 1][col] != null;
+    final rightCovered =
+        _hasCard(pyramid, row + 1, col + 1) && pyramid[row + 1][col + 1] != null;
+    return !(leftCovered || rightCovered);
   }
 
   List<PyramidCardPos> getExposedPositions() {
     final positions = <PyramidCardPos>[];
     for (var r = 0; r < pyramid.length; r++) {
       for (var c = 0; c < pyramid[r].length; c++) {
-        if (!hidden[r][c]) positions.add(PyramidCardPos(r, c));
+        if (isExposed(r, c)) positions.add(PyramidCardPos(r, c));
       }
     }
     return positions;
@@ -136,47 +138,16 @@ class PyramidSolitaireState {
       _value(a) + _value(b) == 13;
   bool canRemoveKing(PyramidCard a) => _value(a) == 13;
 
-  PyramidSolitaireState _revealIfUncovered(
-      PyramidSolitaireState state, int row, int col) {
-    // After removing a card at row+1, col or col+1, the covering card at row,col may become exposed
-    if (!_hasCard(state.pyramid, row, col)) return state;
-    if (!state.hidden[row][col]) return state;
-
-    final covered = _hasCard(state.pyramid, row + 1, col) &&
-        _hasCard(state.pyramid, row + 1, col + 1);
-    if (!covered) {
-      final newHiddenRow = [...state.hidden[row]];
-      newHiddenRow[col] = false;
-      final newHidden = [...state.hidden];
-      newHidden[row] = newHiddenRow;
-      return state.copyWith(hidden: newHidden);
-    }
-    return state;
-  }
-
   PyramidSolitaireState withRemoveAt(int row, int col) {
     if (!isExposed(row, col)) return this;
     final card = pyramid[row][col];
+    if (card == null) return this;
     if (!canRemoveKing(card)) return this;
 
-    final newPyramid = pyramid
-        .mapIndexed((r, list) => r == row
-            ? (list.sublist(0, col) + list.sublist(col + 1))
-            : [...list])
-        .toList();
-    final newHidden = hidden
-        .mapIndexed((r, list) => r == row
-            ? (list.sublist(0, col) + list.sublist(col + 1))
-            : [...list])
-        .toList();
+    final newPyramid = pyramid.map((list) => [...list]).toList();
+    newPyramid[row][col] = null;
 
-    var newState = copyWith(pyramid: newPyramid, hidden: newHidden);
-    // Reveal parent cards
-    if (row > 0) {
-      newState = _revealIfUncovered(newState, row - 1, col);
-      newState = _revealIfUncovered(newState, row - 1, col - 1);
-    }
-    return newState.copyWith(selected: null);
+    return copyWith(pyramid: newPyramid, clearSelected: true);
   }
 
   PyramidSolitaireState withRemovePairFromPyramid(
@@ -184,57 +155,32 @@ class PyramidSolitaireState {
     if (!isExposed(a.row, a.col) || !isExposed(b.row, b.col)) return this;
     final cardA = pyramid[a.row][a.col];
     final cardB = pyramid[b.row][b.col];
+    if (cardA == null || cardB == null) return this;
     if (!canRemovePair(cardA, cardB)) return this;
 
-    final remove = (List<PyramidCard> list, int i) =>
-        list.sublist(0, i) + list.sublist(i + 1);
-    final removeBool =
-        (List<bool> list, int i) => list.sublist(0, i) + list.sublist(i + 1);
+    final newPyramid = pyramid.map((list) => [...list]).toList();
+    newPyramid[a.row][a.col] = null;
+    newPyramid[b.row][b.col] = null;
 
-    var newPyramid = [...pyramid];
-    var newHidden = [...hidden];
-
-    // Remove higher index first to avoid reindexing issues if same row
-    final pairs = [a, b]..sort((x, y) =>
-        x.row == y.row ? y.col.compareTo(x.col) : y.row.compareTo(x.row));
-    for (final p in pairs) {
-      newPyramid[p.row] = remove(newPyramid[p.row], p.col);
-      newHidden[p.row] = removeBool(newHidden[p.row], p.col);
-    }
-
-    var newState = copyWith(pyramid: newPyramid, hidden: newHidden);
-    // Reveal parents
-    for (final p in [a, b]) {
-      if (p.row > 0) {
-        newState = _revealIfUncovered(newState, p.row - 1, p.col);
-        newState = _revealIfUncovered(newState, p.row - 1, p.col - 1);
-      }
-    }
-    return newState.copyWith(selected: null);
+    return copyWith(pyramid: newPyramid, clearSelected: true);
   }
 
   PyramidSolitaireState withRemoveWithWaste(PyramidCardPos pos) {
     if (!isExposed(pos.row, pos.col) || waste.isEmpty) return this;
     final cardA = pyramid[pos.row][pos.col];
     final cardB = waste.last;
+    if (cardA == null) return this;
     if (!canRemovePair(cardA, cardB)) return this;
 
     final newWaste = [...waste]..removeLast();
-    final newPyramidRow = pyramid[pos.row].sublist(0, pos.col) +
-        pyramid[pos.row].sublist(pos.col + 1);
-    final newHiddenRow = hidden[pos.row].sublist(0, pos.col) +
-        hidden[pos.row].sublist(pos.col + 1);
+    final newPyramid = pyramid.map((list) => [...list]).toList();
+    newPyramid[pos.row][pos.col] = null;
 
-    var newState = copyWith(
-      pyramid: [...pyramid]..[pos.row] = newPyramidRow,
-      hidden: [...hidden]..[pos.row] = newHiddenRow,
+    return copyWith(
+      pyramid: newPyramid,
       waste: newWaste,
+      clearSelected: true,
     );
-    if (pos.row > 0) {
-      newState = _revealIfUncovered(newState, pos.row - 1, pos.col);
-      newState = _revealIfUncovered(newState, pos.row - 1, pos.col - 1);
-    }
-    return newState.copyWith(selected: null);
   }
 
   bool get canDraw => stock.isNotEmpty;
@@ -257,6 +203,7 @@ class PyramidSolitaireState {
 
     for (final pos in exposedPositions) {
       final card = pyramid[pos.row][pos.col];
+      if (card == null) continue;
       if (canRemoveKing(card)) {
         return HintSuggestion(
           message:
@@ -271,6 +218,7 @@ class PyramidSolitaireState {
         final bPos = exposedPositions[j];
         final cardA = pyramid[aPos.row][aPos.col];
         final cardB = pyramid[bPos.row][bPos.col];
+        if (cardA == null || cardB == null) continue;
         if (canRemovePair(cardA, cardB)) {
           return HintSuggestion(
             message:
@@ -284,6 +232,7 @@ class PyramidSolitaireState {
     if (wasteCard != null) {
       for (final pos in exposedPositions) {
         final pyramidCard = pyramid[pos.row][pos.col];
+        if (pyramidCard == null) continue;
         if (canRemovePair(pyramidCard, wasteCard)) {
           return HintSuggestion(
             message:
@@ -308,8 +257,7 @@ class PyramidSolitaireState {
   bool get isVictory => pyramid.every((row) => row.isEmpty);
 
   PyramidSolitaireState copyWith({
-    List<List<PyramidCard>>? pyramid,
-    List<List<bool>>? hidden,
+    List<List<PyramidCard?>>? pyramid,
     List<PyramidCard>? stock,
     List<PyramidCard>? waste,
     bool? usedUndo,
@@ -323,7 +271,6 @@ class PyramidSolitaireState {
 
     return PyramidSolitaireState(
       pyramid: pyramid ?? this.pyramid,
-      hidden: hidden ?? this.hidden,
       stock: stock ?? this.stock,
       waste: waste ?? this.waste,
       usedUndo: usedUndo ?? this.usedUndo,
@@ -356,6 +303,7 @@ class PyramidSolitaire extends HookConsumerWidget {
     final pyramidKey = useMemoized(() => GlobalKey());
     final stockKey = useMemoized(() => GlobalKey());
     final wasteKey = useMemoized(() => GlobalKey());
+    final pairingGuideKey = useMemoized(() => GlobalKey());
 
     void startTutorial() {
       showGameTutorial(
@@ -364,12 +312,17 @@ class PyramidSolitaire extends HookConsumerWidget {
           TutorialScreen.key(
             key: pyramidKey,
             message:
-                'Welcome to Pyramid! Remove cards summing to 13. Kings can be removed alone. Only exposed cards (not covered by two cards below) can be selected.',
+                'Welcome to Pyramid! Remove cards that sum to 13. Kings stand alone. Only exposed cards (with both covering cards removed) can be tapped.',
           ),
           TutorialScreen.key(
             key: wasteKey,
             message:
                 'You can pair an exposed pyramid card with the top waste card if they sum to 13. Tap to try pairing!',
+          ),
+          TutorialScreen.key(
+            key: pairingGuideKey,
+            message:
+                'Need help remembering the pairs? Use this quick guide to match A+Q, 2+J, 3+10, 4+9, 5+8, and 6+7. Kings remove themselves.',
           ),
           TutorialScreen.key(
             key: stockKey,
@@ -410,133 +363,326 @@ class PyramidSolitaire extends HookConsumerWidget {
         final minSize = constraints.smallest.longestSide;
         final spacing = minSize / 100;
 
-        final maxRows = axis == Axis.horizontal
-            ? 4.0
-            : 10.0; // allow a bit more headroom in portrait
-        final maxCols = axis == Axis.horizontal ? 9.0 : 7.0;
+        const totalRows = 7;
+        final baseRowCards =
+            state.value.pyramid.isNotEmpty ? state.value.pyramid.last.length : 7;
+        const rowStepFactor = 0.58;
 
-        final sizeMultiplier = constraints.findCardSizeMultiplier(
-          maxRows: maxRows,
-          maxCols: maxCols,
-          spacing: spacing,
-        );
+        double horizontalGap;
+        double outerMargin;
+        double sizeMultiplier;
 
-        Widget buildPyramid() {
-          final cardWidth = 69 * sizeMultiplier;
-          return Column(
-            key: pyramidKey,
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.center,
+        if (axis == Axis.vertical) {
+          horizontalGap = 1.0;
+          outerMargin = spacing * 0.25;
+          final effectiveHeightUnits =
+              1 + rowStepFactor * (totalRows - 1); // in card heights
+          final verticalAvailable = max(0.0, constraints.maxHeight - spacing * 8);
+          final verticalMultiplier =
+              verticalAvailable / (93 * effectiveHeightUnits);
+
+          final availableWidth = max(
+            0.0,
+            constraints.maxWidth -
+                outerMargin * 2 -
+                horizontalGap * (baseRowCards - 1),
+          );
+          final horizontalMultiplier =
+              availableWidth / (69 * baseRowCards);
+
+          sizeMultiplier = min(horizontalMultiplier, verticalMultiplier);
+        } else {
+          horizontalGap = spacing;
+          outerMargin = spacing;
+          sizeMultiplier = constraints.findCardSizeMultiplier(
+            maxRows: 4.5,
+            maxCols: 9.5,
             spacing: spacing,
-            children: List.generate(state.value.pyramid.length, (r) {
-              final rowCards = state.value.pyramid[r];
-
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                spacing: spacing,
-                children: List.generate(rowCards.length, (c) {
-                  final isSelected = state.value.selected?.row == r &&
-                      state.value.selected?.col == c;
-
-                  return Container(
-                    decoration: isSelected
-                        ? BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.yellow.withOpacity(0.8),
-                                blurRadius: 20,
-                                spreadRadius: 4,
-                              ),
-                            ],
-                          )
-                        : null,
-                    child: SizedBox(
-                      width: cardWidth,
-                      height: 93 * sizeMultiplier,
-                    ),
-                  );
-                }),
-              );
-            }),
           );
         }
 
-        Widget buildPyramidCards() {
-          final cardWidth = 69 * sizeMultiplier;
-          final cardHeight = 93 * sizeMultiplier;
+        final cardWidth = 69 * sizeMultiplier;
+        final cardHeight = 93 * sizeMultiplier;
+        final cardSpacingX = cardWidth + horizontalGap;
+        final rowStep = cardHeight * rowStepFactor;
 
-          return Stack(
-            children: List.generate(state.value.pyramid.length, (r) {
-              final rowCards = state.value.pyramid[r];
-              final rowHidden = state.value.hidden[r];
-              final rowWidth = (cardWidth * rowCards.length) +
-                  (spacing * (rowCards.length - 1));
+        void handleCardTap(int row, int col) {
+          final card = state.value.pyramid[row][col];
+          if (card == null || !state.value.isExposed(row, col)) return;
 
-              return Positioned(
-                top: r * (cardHeight + spacing),
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: SizedBox(
-                    width: rowWidth,
-                    height: cardHeight,
-                    child: CardLinearGroup<PyramidCard, dynamic>(
-                      value: 'pyr-row-$r',
-                      values: rowCards,
+          void selectCard() {
+            state.value = state.value.copyWith(selected: PyramidCardPos(row, col));
+          }
+
+          if (state.value.canRemoveKing(card)) {
+            ref.read(audioServiceProvider).playPlace();
+            state.value = state.value.withRemoveAt(row, col);
+            return;
+          }
+
+          final wasteCard = state.value.waste.lastOrNull;
+          if (wasteCard != null && state.value.canRemovePair(card, wasteCard)) {
+            ref.read(audioServiceProvider).playPlace();
+            state.value =
+                state.value.withRemoveWithWaste(PyramidCardPos(row, col));
+            return;
+          }
+
+          final selected = state.value.selected;
+          if (selected == null) {
+            selectCard();
+            return;
+          }
+
+          if (selected.row == row && selected.col == col) {
+            state.value = state.value.copyWith(clearSelected: true);
+            return;
+          }
+
+          final other = state.value.pyramid[selected.row][selected.col];
+          if (other != null && state.value.canRemovePair(card, other)) {
+            ref.read(audioServiceProvider).playPlace();
+            state.value = state.value.withRemovePairFromPyramid(
+              PyramidCardPos(row, col),
+              PyramidCardPos(selected.row, selected.col),
+            );
+            return;
+          }
+
+          selectCard();
+        }
+
+        Widget buildCard(int row, int col) {
+          final card = state.value.pyramid[row][col];
+          final isSelected =
+              state.value.selected?.row == row && state.value.selected?.col == col;
+          final isPlayable =
+              card != null && state.value.isExposed(row, col);
+
+          return SizedBox(
+            width: cardWidth,
+            height: cardHeight,
+            child: AnimatedContainer(
+              duration: Duration(milliseconds: 200),
+              decoration: isSelected
+                  ? BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.yellow.withOpacity(0.7),
+                          blurRadius: 18,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    )
+                  : isPlayable
+                      ? BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.35),
+                              blurRadius: 6,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        )
+                      : null,
+              child: card == null
+                  ? const SizedBox.shrink()
+                  : CardLinearGroup<PyramidCard, dynamic>(
+                      value: 'pyr-$row-$col',
+                      values: [card],
                       maxGrabStackSize: 0,
-                      cardOffset: Offset(cardWidth + spacing, 0),
-                      canCardBeGrabbed: (index, __) => !rowHidden[index],
-                      isCardFlipped: (index, __) => rowHidden[index],
-                      onCardPressed: (pressedCard) {
-                        final c = rowCards.indexOf(pressedCard);
-                        if (c == -1) return;
-                        if (rowHidden[c]) return;
-                        if (state.value.canRemoveKing(pressedCard)) {
-                          ref.read(audioServiceProvider).playPlace();
-                          state.value = state.value.withRemoveAt(r, c);
-                          return;
-                        }
-                        if (state.value.waste.isNotEmpty &&
-                            state.value.canRemovePair(
-                                pressedCard, state.value.waste.last)) {
-                          ref.read(audioServiceProvider).playPlace();
-                          state.value = state.value
-                              .withRemoveWithWaste(PyramidCardPos(r, c));
-                          return;
-                        }
-                        final selected = state.value.selected;
-                        if (selected == null) {
-                          state.value = state.value
-                              .copyWith(selected: PyramidCardPos(r, c));
-                          return;
-                        }
-                        if (selected.row == r && selected.col == c) {
-                          state.value =
-                              state.value.copyWith(clearSelected: true);
-                          return;
-                        }
-                        final other =
-                            state.value.pyramid[selected.row][selected.col];
-                        if (state.value.canRemovePair(pressedCard, other)) {
-                          ref.read(audioServiceProvider).playPlace();
-                          state.value = state.value.withRemovePairFromPyramid(
-                            PyramidCardPos(r, c),
-                            PyramidCardPos(selected.row, selected.col),
-                          );
-                          return;
-                        }
-                        state.value = state.value
-                            .copyWith(selected: PyramidCardPos(r, c));
-                      },
-                      canMoveCardHere: (_) => false,
+                      cardOffset: Offset.zero,
+                      canCardBeGrabbed: (_, __) => false,
+                      isCardFlipped: (_, __) => false,
+                      onCardPressed: (_) => handleCardTap(row, col),
                     ),
-                  ),
+            ),
+          );
+        }
+
+        Widget buildPyramidStack() {
+          final baseRowWidth =
+              cardWidth * baseRowCards + horizontalGap * (baseRowCards - 1);
+          final tableauWidth = baseRowWidth + outerMargin * 2;
+          final tableauHeight = cardHeight + rowStep * (totalRows - 1);
+
+          final positionedCards = <Widget>[];
+          for (var row = 0; row < totalRows; row++) {
+            final rowLength = state.value.pyramid[row].length;
+            final startOffset = outerMargin +
+                (baseRowWidth -
+                        (cardWidth * rowLength +
+                            horizontalGap * (rowLength - 1))) /
+                    2;
+            for (var col = 0; col < rowLength; col++) {
+              final left = startOffset + col * cardSpacingX;
+              final top = row * rowStep;
+              positionedCards.add(
+                Positioned(
+                  left: left,
+                  top: top,
+                  child: buildCard(row, col),
                 ),
               );
-            }),
+            }
+          }
+
+          return SizedBox(
+            key: pyramidKey,
+            width: tableauWidth,
+            height: tableauHeight,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: positionedCards,
+              fit: StackFit.passthrough,
+            ),
           );
         }
+
+        final stockDeck = CardDeck<PyramidCard, dynamic>.flipped(
+          key: stockKey,
+          value: 'stock',
+          values: state.value.stock,
+          onCardPressed: (_) {
+            if (!state.value.canDraw) return;
+            ref.read(audioServiceProvider).playDraw();
+            state.value = state.value.withDraw();
+          },
+        );
+
+        final wasteDeck = CardDeck<PyramidCard, dynamic>(
+          key: wasteKey,
+          value: 'waste',
+          values: state.value.waste,
+          onCardPressed: (pressed) {
+            if (state.value.waste.isEmpty ||
+                pressed != state.value.waste.last) {
+              return;
+            }
+            final topCard = state.value.waste.last;
+            if (state.value.canRemoveKing(topCard)) {
+              ref.read(audioServiceProvider).playPlace();
+              state.value = state.value.copyWith(
+                waste: state.value.waste.sublist(
+                  0,
+                  state.value.waste.length - 1,
+                ),
+                clearSelected: true,
+              );
+              return;
+            }
+
+            final selected = state.value.selected;
+            if (selected != null) {
+              final other =
+                  state.value.pyramid[selected.row][selected.col];
+              if (other != null && state.value.canRemovePair(topCard, other)) {
+                ref.read(audioServiceProvider).playPlace();
+                state.value =
+                    state.value.withRemoveWithWaste(selected);
+              }
+            }
+          },
+        );
+
+        Widget buildPairingGuide() {
+          const combos = [
+            'K alone',
+            'A + Q',
+            '2 + J',
+            '3 + 10',
+            '4 + 9',
+            '5 + 8',
+            '6 + 7',
+          ];
+
+          return Container(
+            key: pairingGuideKey,
+            padding: EdgeInsets.symmetric(
+              horizontal: spacing * 2,
+              vertical: spacing * 1.2,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.white.withOpacity(0.12)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  'Pairs that make 13',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16 * sizeMultiplier.clamp(0.8, 1.4),
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: spacing),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: spacing,
+                  runSpacing: spacing * 0.6,
+                  children: combos
+                      .map(
+                        (combo) => Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: spacing * 1.2,
+                            vertical: spacing * 0.6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            combo,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14 * sizeMultiplier.clamp(0.9, 1.3),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
+            ),
+          );
+        }
+
+        Widget buildDeckArea() {
+          final deckDisplay = axis == Axis.vertical
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    stockDeck,
+                    SizedBox(width: spacing * 2),
+                    wasteDeck,
+                  ],
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  spacing: spacing * 2,
+                  children: [
+                    stockDeck,
+                    wasteDeck,
+                  ],
+                );
+
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            spacing: spacing * 1.5,
+            children: [
+              deckDisplay,
+              buildPairingGuide(),
+            ],
+          );
+        }
+
+        final deckGap = spacing + cardHeight * 0.1;
 
         return CardGame<PyramidCard, dynamic>(
           gameKey: gameKey,
@@ -563,75 +709,30 @@ class PyramidSolitaire extends HookConsumerWidget {
             ),
           ),
           children: [
-            Flex(
-              direction: axis,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              spacing: spacing,
-              children: [
-                Expanded(
-                  child: Stack(
-                    children: [
-                      buildPyramid(),
-                      buildPyramidCards(),
-                    ],
+            if (axis == Axis.horizontal)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: buildPyramidStack(),
+                    ),
                   ),
-                ),
-                SizedBox(width: spacing),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  spacing: spacing * 2,
-                  children: [
-                    GestureDetector(
-                      key: stockKey,
-                      behavior: HitTestBehavior.opaque,
-                      onTap: state.value.canDraw
-                          ? () {
-                              ref.read(audioServiceProvider).playDraw();
-                              state.value = state.value.withDraw();
-                            }
-                          : null,
-                      child: CardDeck<PyramidCard, dynamic>.flipped(
-                        value: 'stock',
-                        values: state.value.stock,
-                      ),
-                    ),
-                    CardDeck<PyramidCard, dynamic>(
-                      key: wasteKey,
-                      value: 'waste',
-                      values: state.value.waste.isEmpty
-                          ? const []
-                          : [state.value.waste.last],
-                      canGrab: false,
-                      onCardPressed: (top) {
-                        if (state.value.waste.isEmpty) return;
-                        final topCard = state.value.waste.last;
-                        // Remove King in waste
-                        if (state.value.canRemoveKing(topCard)) {
-                          ref.read(audioServiceProvider).playPlace();
-                          state.value = state.value.copyWith(
-                              waste: state.value.waste
-                                  .sublist(0, state.value.waste.length - 1),
-                              clearSelected: true);
-                          return;
-                        }
-                        // Try pair with selected pyramid card
-                        final selected = state.value.selected;
-                        if (selected != null) {
-                          final other =
-                              state.value.pyramid[selected.row][selected.col];
-                          if (state.value.canRemovePair(topCard, other)) {
-                            ref.read(audioServiceProvider).playPlace();
-                            state.value = state.value.withRemoveWithWaste(
-                                PyramidCardPos(selected.row, selected.col));
-                          }
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  SizedBox(width: spacing * 2),
+                  buildDeckArea(),
+                ],
+              )
+            else
+              Column(
+                children: [
+                  Expanded(
+                    child: Center(child: buildPyramidStack()),
+                  ),
+                  SizedBox(height: deckGap),
+                  buildDeckArea(),
+                ],
+              ),
           ],
         );
       },

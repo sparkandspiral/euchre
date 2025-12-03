@@ -359,7 +359,7 @@ class _DifficultySheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return ThemedSheet(
       title: game.title,
-      subtitle: 'Tap a difficulty to start playing immediately.',
+      // subtitle: 'Tap a difficulty to start playing.',
       child: Column(
         children: Difficulty.values
             .map(

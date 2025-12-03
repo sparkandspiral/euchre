@@ -231,30 +231,45 @@ class CardScaffold extends HookConsumerWidget {
           : 'Out of hints — watch an ad to earn $hintRewardAmount more';
       final disableButton =
           isHintProcessing.value || isVictory || onHint == null;
+      final hasHints = hintCount > 0;
 
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        spacing: 8,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text(
-            'Hints: $hintCount',
-            style: const TextStyle(fontSize: 16),
-          ),
-          Tooltip(
-            message: tooltipText,
-            child: ElevatedButton(
+      return Tooltip(
+        message: tooltipText,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white.withValues(alpha: 0.5),
               ),
               onPressed: disableButton ? null : handleHintPressed,
               child: Icon(
                 Icons.tips_and_updates,
-                color: hintCount > 0 ? Colors.white : Colors.yellow[200],
+                color: hasHints ? Colors.white : Colors.yellow[200],
               ),
             ),
-          ),
-        ],
+            Positioned(
+              right: -4,
+              top: -4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: hasHints ? Colors.orange : Colors.grey,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.white, width: 1.2),
+                ),
+                child: Text(
+                  '$hintCount',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       );
     }
 

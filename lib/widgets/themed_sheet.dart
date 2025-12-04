@@ -10,12 +10,14 @@ class ThemedSheet extends StatelessWidget {
   final String title;
   final String? subtitle;
   final Widget child;
+  final ScrollController? scrollController;
 
   const ThemedSheet({
     super.key,
     required this.title,
     this.subtitle,
     required this.child,
+    this.scrollController,
   });
 
   @override
@@ -25,6 +27,7 @@ class ThemedSheet extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.only(bottom: bottomPadding),
         child: SingleChildScrollView(
+          controller: scrollController,
           physics: BouncingScrollPhysics(),
           child: Container(
             margin: EdgeInsets.only(top: 8),

@@ -80,7 +80,8 @@ class PyramidSolitaireState {
     // Build pyramid structure
     final pyramid = <List<PyramidCard?>>[];
     for (var r = 0; r < 7; r++) {
-      final row = deck.take(r + 1).toList().map<PyramidCard?>((c) => c).toList();
+      final row =
+          deck.take(r + 1).toList().map<PyramidCard?>((c) => c).toList();
       deck = deck.skip(r + 1).toList();
       pyramid.add(row);
     }
@@ -119,8 +120,8 @@ class PyramidSolitaireState {
     if (row == pyramid.length - 1) return true;
     final leftCovered =
         _hasCard(pyramid, row + 1, col) && pyramid[row + 1][col] != null;
-    final rightCovered =
-        _hasCard(pyramid, row + 1, col + 1) && pyramid[row + 1][col + 1] != null;
+    final rightCovered = _hasCard(pyramid, row + 1, col + 1) &&
+        pyramid[row + 1][col + 1] != null;
     return !(leftCovered || rightCovered);
   }
 
@@ -364,8 +365,9 @@ class PyramidSolitaire extends HookConsumerWidget {
         final spacing = minSize / 100;
 
         const totalRows = 7;
-        final baseRowCards =
-            state.value.pyramid.isNotEmpty ? state.value.pyramid.last.length : 7;
+        final baseRowCards = state.value.pyramid.isNotEmpty
+            ? state.value.pyramid.last.length
+            : 7;
         const rowStepFactor = 0.58;
 
         double horizontalGap;
@@ -377,7 +379,8 @@ class PyramidSolitaire extends HookConsumerWidget {
           outerMargin = spacing * 0.25;
           final effectiveHeightUnits =
               1 + rowStepFactor * (totalRows - 1); // in card heights
-          final verticalAvailable = max(0.0, constraints.maxHeight - spacing * 8);
+          final verticalAvailable =
+              max(0.0, constraints.maxHeight - spacing * 8);
           final verticalMultiplier =
               verticalAvailable / (93 * effectiveHeightUnits);
 
@@ -387,8 +390,7 @@ class PyramidSolitaire extends HookConsumerWidget {
                 outerMargin * 2 -
                 horizontalGap * (baseRowCards - 1),
           );
-          final horizontalMultiplier =
-              availableWidth / (69 * baseRowCards);
+          final horizontalMultiplier = availableWidth / (69 * baseRowCards);
 
           sizeMultiplier = min(horizontalMultiplier, verticalMultiplier);
         } else {
@@ -411,7 +413,8 @@ class PyramidSolitaire extends HookConsumerWidget {
           if (card == null || !state.value.isExposed(row, col)) return;
 
           void selectCard() {
-            state.value = state.value.copyWith(selected: PyramidCardPos(row, col));
+            state.value =
+                state.value.copyWith(selected: PyramidCardPos(row, col));
           }
 
           if (state.value.canRemoveKing(card)) {
@@ -454,52 +457,38 @@ class PyramidSolitaire extends HookConsumerWidget {
 
         Widget buildCard(int row, int col) {
           final card = state.value.pyramid[row][col];
-          final isSelected =
-              state.value.selected?.row == row && state.value.selected?.col == col;
-          final isPlayable =
-              card != null && state.value.isExposed(row, col);
-
+          final cards =
+              card == null ? const <PyramidCard>[] : <PyramidCard>[card];
           return SizedBox(
             width: cardWidth,
             height: cardHeight,
-            child: AnimatedContainer(
-              duration: Duration(milliseconds: 200),
-              decoration: isSelected
-                  ? BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.yellow.withOpacity(0.7),
-                          blurRadius: 18,
-                          spreadRadius: 4,
-                        ),
-                      ],
-                    )
-                  : isPlayable
-                      ? BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.35),
-                              blurRadius: 6,
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        )
-                      : null,
-              child: card == null
-                  ? const SizedBox.shrink()
-                  : CardLinearGroup<PyramidCard, dynamic>(
-                      value: 'pyr-$row-$col',
-                      values: [card],
-                      maxGrabStackSize: 0,
-                      cardOffset: Offset.zero,
-                      canCardBeGrabbed: (_, __) => false,
-                      isCardFlipped: (_, __) => false,
-                      onCardPressed: (_) => handleCardTap(row, col),
-                    ),
+            child: CardLinearGroup<PyramidCard, String>(
+              value: 'pyr-$row-$col',
+              values: cards,
+              maxGrabStackSize: 0,
+              cardOffset: Offset.zero,
+              canCardBeGrabbed: (_, __) => false,
+              isCardFlipped: (_, __) => false,
+              onCardPressed:
+                  cards.isEmpty ? null : (_) => handleCardTap(row, col),
             ),
           );
+        }
+
+        PyramidCardPos? parsePyramidGroupId(String groupValue) {
+          if (!groupValue.startsWith('pyr-')) {
+            return null;
+          }
+          final parts = groupValue.split('-');
+          if (parts.length != 3) {
+            return null;
+          }
+          final row = int.tryParse(parts[1]);
+          final col = int.tryParse(parts[2]);
+          if (row == null || col == null) {
+            return null;
+          }
+          return PyramidCardPos(row, col);
         }
 
         Widget buildPyramidStack() {
@@ -541,7 +530,7 @@ class PyramidSolitaire extends HookConsumerWidget {
           );
         }
 
-        final stockDeck = CardDeck<PyramidCard, dynamic>.flipped(
+        final stockDeck = CardDeck<PyramidCard, String>.flipped(
           key: stockKey,
           value: 'stock',
           values: state.value.stock,
@@ -552,7 +541,7 @@ class PyramidSolitaire extends HookConsumerWidget {
           },
         );
 
-        final wasteDeck = CardDeck<PyramidCard, dynamic>(
+        final wasteDeck = CardDeck<PyramidCard, String>(
           key: wasteKey,
           value: 'waste',
           values: state.value.waste,
@@ -576,12 +565,10 @@ class PyramidSolitaire extends HookConsumerWidget {
 
             final selected = state.value.selected;
             if (selected != null) {
-              final other =
-                  state.value.pyramid[selected.row][selected.col];
+              final other = state.value.pyramid[selected.row][selected.col];
               if (other != null && state.value.canRemovePair(topCard, other)) {
                 ref.read(audioServiceProvider).playPlace();
-                state.value =
-                    state.value.withRemoveWithWaste(selected);
+                state.value = state.value.withRemoveWithWaste(selected);
               }
             }
           },
@@ -684,29 +671,68 @@ class PyramidSolitaire extends HookConsumerWidget {
 
         final deckGap = spacing + cardHeight * 0.1;
 
-        return CardGame<PyramidCard, dynamic>(
+        return CardGame<PyramidCard, String>(
           gameKey: gameKey,
-          style: CardGameStyle<PyramidCard, dynamic>(
+          style: CardGameStyle<PyramidCard, String>(
             cardSize: Size(69, 93) * sizeMultiplier,
             emptyGroupBuilder: (group, state) => const SizedBox.shrink(),
-            cardBuilder: (value, group, flipped, cardState) =>
-                AnimatedFlippable(
-              duration: Duration(milliseconds: 300),
-              curve: Curves.easeInOutCubic,
-              isFlipped: flipped,
-              front: PlayingCardBuilder(card: value.card),
-              back: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                clipBehavior: Clip.hardEdge,
-                child: Container(
-                  foregroundDecoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.black, width: 2),
+            cardBuilder: (value, group, flipped, cardState) {
+              final position = parsePyramidGroupId(group);
+              final selectedPos = state.value.selected;
+              final isSelected = position != null &&
+                  selectedPos?.row == position.row &&
+                  selectedPos?.col == position.col;
+              final isPlayable = position != null &&
+                  state.value.isExposed(position.row, position.col);
+              final showDepthShadow = position != null && !isPlayable;
+              final accentColor = Theme.of(context).colorScheme.secondary;
+              final shadows = <BoxShadow>[
+                if (isSelected)
+                  BoxShadow(
+                    color: accentColor.withOpacity(0.45),
+                    blurRadius: 18,
+                    spreadRadius: 1.2,
                   ),
-                  child: cardBack.build(),
+                if (showDepthShadow)
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.35),
+                    blurRadius: 10,
+                    offset: Offset(0, 6),
+                  ),
+              ];
+
+              return AnimatedContainer(
+                duration: Duration(milliseconds: 200),
+                curve: Curves.easeInOutCubic,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: isSelected
+                      ? Border.all(
+                          color: accentColor,
+                          width: 2.2,
+                        )
+                      : null,
+                  boxShadow: shadows.isEmpty ? null : shadows,
                 ),
-              ),
-            ),
+                child: AnimatedFlippable(
+                  duration: Duration(milliseconds: 300),
+                  curve: Curves.easeInOutCubic,
+                  isFlipped: flipped,
+                  front: PlayingCardBuilder(card: value.card),
+                  back: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    clipBehavior: Clip.hardEdge,
+                    child: Container(
+                      foregroundDecoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.black, width: 2),
+                      ),
+                      child: cardBack.build(),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
           children: [
             if (axis == Axis.horizontal)

@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:solitaire/dialogs/achievement_dialog.dart';
 import 'package:solitaire/dialogs/customization_dialog.dart';
 import 'package:solitaire/dialogs/settings_dialog.dart';
+import 'package:solitaire/dialogs/stats_dialog.dart';
 import 'package:solitaire/game_view.dart';
 import 'package:solitaire/games/free_cell.dart';
 import 'package:solitaire/games/golf_solitaire.dart';
@@ -14,6 +15,7 @@ import 'package:solitaire/games/tri_peaks_solitaire.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/providers/save_state_notifier.dart';
+import 'package:solitaire/styles/game_visuals.dart';
 import 'package:solitaire/utils/build_context_extensions.dart';
 import 'package:solitaire/widgets/themed_sheet.dart';
 
@@ -53,44 +55,6 @@ class HomePage extends ConsumerWidget {
                   startWithTutorial: startWithTutorial,
                 ),
           };
-
-  // Game-specific gradient colors
-  Map<Game, List<Color>> get gameGradients => {
-        Game.klondike: [Color(0xFF00A8CC), Color(0xFF0074B7)],
-        Game.spider: [Color(0xFF8B2FC9), Color(0xFF5C0099)],
-        Game.freeCell: [Color(0xFFE63946), Color(0xFFC41E3A)],
-        Game.pyramid: [Color(0xFFE67E22), Color(0xFFD35400)],
-        Game.golf: [Color(0xFF27AE60), Color(0xFF1E8449)],
-        Game.triPeaks: [Color(0xFFFFD700), Color(0xFFB8860B)],
-      };
-
-  // Game logos
-  Map<Game, String> get gameLogos => {
-        Game.klondike: 'assets/logos/klondike.png',
-        Game.spider: 'assets/logos/spider.png',
-        Game.freeCell: 'assets/logos/freecell.png',
-        Game.pyramid: 'assets/logos/pyramid.png',
-        Game.golf: 'assets/logos/golf.png',
-        Game.triPeaks: 'assets/logos/tripeaks.png',
-      };
-
-  // Game icons
-  IconData getGameIcon(Game game) {
-    switch (game) {
-      case Game.klondike:
-        return Icons.stars;
-      case Game.spider:
-        return Icons.apps;
-      case Game.freeCell:
-        return Icons.dashboard;
-      case Game.pyramid:
-        return Icons.change_history;
-      case Game.golf:
-        return Icons.terrain;
-      case Game.triPeaks:
-        return Icons.filter_hdr;
-    }
-  }
 
   void _startGame({
     required BuildContext context,
@@ -152,8 +116,6 @@ class HomePage extends ConsumerWidget {
         elevation: 0,
         title: Row(
           children: [
-            Icon(Icons.games, size: 28),
-            SizedBox(width: 12),
             Text(
               'Solitaire Collection',
               style: TextStyle(
@@ -176,6 +138,13 @@ class HomePage extends ConsumerWidget {
             child: IconButton(
               icon: Icon(Symbols.palette, fill: 1),
               onPressed: () => CustomizationDialog.show(context),
+            ),
+          ),
+          Tooltip(
+            message: 'Stats',
+            child: IconButton(
+              icon: Icon(Symbols.query_stats, fill: 1),
+              onPressed: () => StatsDialog.show(context),
             ),
           ),
           Tooltip(
@@ -214,9 +183,9 @@ class HomePage extends ConsumerWidget {
 
               return _GameCard(
                 game: game,
-                gradient: gameGradients[game]!,
-                icon: getGameIcon(game),
-                logoAsset: gameLogos[game]!,
+                gradient: game.accentGradient,
+                icon: game.icon,
+                logoAsset: game.logoAsset,
                 onSelectDifficulty: () => _showDifficultySelector(
                   rootContext: context,
                   ref: ref,

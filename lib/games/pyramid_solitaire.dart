@@ -10,6 +10,7 @@ import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/immutable_history.dart';
 import 'package:solitaire/model/hint.dart';
+import 'package:solitaire/services/achievement_service.dart';
 import 'package:solitaire/services/audio_service.dart';
 import 'package:solitaire/styles/playing_card_builder.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
@@ -300,6 +301,13 @@ class PyramidSolitaire extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = useState(initialState);
+    useOnListenableChange(
+      state,
+      () => ref
+          .read(achievementServiceProvider)
+          .checkPyramidSolitaireMoveAchievements(
+              state: state.value, difficulty: difficulty),
+    );
 
     final pyramidKey = useMemoized(() => GlobalKey());
     final stockKey = useMemoized(() => GlobalKey());
@@ -358,7 +366,9 @@ class PyramidSolitaire extends HookConsumerWidget {
           : () => state.value = state.value.withUndo(),
       onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
-      // No per-game achievement checks for Pyramid currently; global checks handled by CardScaffold
+      onVictory: () => ref
+          .read(achievementServiceProvider)
+          .checkPyramidSolitaireCompletionAchievements(state: state.value),
       builder: (context, constraints, cardBack, autoMoveEnabled, gameKey) {
         final axis = constraints.largestAxis;
         final minSize = constraints.smallest.longestSide;

@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:solitaire/games/free_cell.dart';
 import 'package:solitaire/games/golf_solitaire.dart';
+import 'package:solitaire/games/pyramid_solitaire.dart';
 import 'package:solitaire/games/solitaire.dart';
 import 'package:solitaire/games/spider_solitaire.dart';
 import 'package:solitaire/games/tri_peaks_solitaire.dart';
@@ -18,6 +19,9 @@ part 'achievement_service.g.dart';
 
 class AchievementService {
   final Ref ref;
+
+  static const _initialSpiderStockLength = 50;
+  static const _totalPyramidCards = 28;
 
   const AchievementService(this.ref);
 
@@ -37,22 +41,26 @@ class AchievementService {
     }
 
     if (saveState.gameStates.length == Game.values.length &&
-        saveState.gameStates.values.every((gameState) => gameState.states[Difficulty.classic] != null)) {
+        saveState.gameStates.values.every(
+            (gameState) => gameState.states[Difficulty.classic] != null)) {
       await _markAchievement(Achievement.fullHouse);
     }
 
     if (saveState.gameStates.length == Game.values.length &&
-        saveState.gameStates.values.every((gameState) => gameState.states[Difficulty.royal] != null)) {
+        saveState.gameStates.values
+            .every((gameState) => gameState.states[Difficulty.royal] != null)) {
       await _markAchievement(Achievement.royalFlush);
     }
 
     if (saveState.gameStates.length == Game.values.length &&
-        saveState.gameStates.values.every((gameState) => gameState.states[Difficulty.ace] != null)) {
+        saveState.gameStates.values
+            .every((gameState) => gameState.states[Difficulty.ace] != null)) {
       await _markAchievement(Achievement.aceUpYourSleeve);
     }
   }
 
-  Future<void> checkGolfSolitaireMoveAchievements({required GolfSolitaireState state}) async {
+  Future<void> checkGolfSolitaireMoveAchievements(
+      {required GolfSolitaireState state}) async {
     if (state.chain == 20) {
       await _markAchievement(Achievement.grandSlam);
     }
@@ -67,10 +75,16 @@ class AchievementService {
     }
   }
 
-  Future<void> checkFreeCellMoveAchievements({required FreeCellState state}) async {
-    final completedFoundations = state.foundationCards.values.where((cards) => cards.length == 13).toList();
+  Future<void> checkFreeCellMoveAchievements(
+      {required FreeCellState state}) async {
+    final completedFoundations = state.foundationCards.values
+        .where((cards) => cards.length == 13)
+        .toList();
     final emptyFoundations = state.foundationCards
-        .where((suit, cards) => cards.isEmpty && state.history.every((state) => state.foundationCards[suit]!.isEmpty))
+        .where((suit, cards) =>
+            cards.isEmpty &&
+            state.history
+                .every((state) => state.foundationCards[suit]!.isEmpty))
         .values
         .toList();
 
@@ -101,20 +115,56 @@ class AchievementService {
     }
   }
 
-  Future<void> checkSpiderSolitaireMoveAchievements({required SpiderSolitaireState state}) async {
-    // Placeholder for move-based achievements
-    // Can add achievements here like "Complete 3 sequences without undoing" etc.
+  Future<void> checkSpiderSolitaireMoveAchievements(
+      {required SpiderSolitaireState state}) async {
+    final clearedHalfWeb = state.stock.length == _initialSpiderStockLength &&
+        state.completedSequences >= 4;
+    if (clearedHalfWeb) {
+      await _markAchievement(Achievement.silkRoad);
+    }
   }
 
   Future<void> checkSpiderSolitaireCompletionAchievements({
     required Difficulty difficulty,
     required SpiderSolitaireState state,
   }) async {
-    // Placeholder for completion-based achievements
-    // Can add achievements here like "Win with no cards left in stock" etc.
+    if (difficulty == Difficulty.ace && !state.usedUndo) {
+      await _markAchievement(Achievement.eightfoldMaster);
+    }
   }
 
-  Future<void> checkTriPeaksSolitaireMoveAchievements({required TriPeaksSolitaireState state}) async {
+  Future<void> checkPyramidSolitaireMoveAchievements({
+    required PyramidSolitaireState state,
+    required Difficulty difficulty,
+  }) async {
+    final startWithWasteCard = difficulty.index >= Difficulty.royal.index;
+    final initialStock = 52 -
+        _totalPyramidCards -
+        (startWithWasteCard
+            ? 1
+            : 0); // subtract waste card if one is dealt at start
+    final remainingCards = state.pyramid.fold<int>(
+      0,
+      (sum, row) => sum + row.where((card) => card != null).length,
+    );
+    final removedCards = _totalPyramidCards - remainingCards;
+    final noDrawsYet = state.stock.length == initialStock;
+
+    if (noDrawsYet && removedCards >= 10) {
+      await _markAchievement(Achievement.desertRunner);
+    }
+  }
+
+  Future<void> checkPyramidSolitaireCompletionAchievements({
+    required PyramidSolitaireState state,
+  }) async {
+    if (state.stock.length >= 10) {
+      await _markAchievement(Achievement.sunDial);
+    }
+  }
+
+  Future<void> checkTriPeaksSolitaireMoveAchievements(
+      {required TriPeaksSolitaireState state}) async {
     if (state.longestStreak >= 15) {
       await _markAchievement(Achievement.peakPerformance);
     }
@@ -135,7 +185,9 @@ class AchievementService {
       return;
     }
 
-    await ref.read(saveStateNotifierProvider.notifier).deleteAchievement(achievement: achievement);
+    await ref
+        .read(saveStateNotifierProvider.notifier)
+        .deleteAchievement(achievement: achievement);
 
     final context = scaffoldMessengerKey.currentContext;
     if (context != null) {
@@ -151,10 +203,19 @@ class AchievementService {
       return;
     }
 
-    await ref.read(saveStateNotifierProvider.notifier).saveAchievement(achievement: achievement);
+    await ref
+        .read(saveStateNotifierProvider.notifier)
+        .saveAchievement(achievement: achievement);
 
     final context = scaffoldMessengerKey.currentContext;
     if (context != null) {
+      CardBack? unlockedBack;
+      for (final back in CardBack.values) {
+        if (back.achievementLock == achievement) {
+          unlockedBack = back;
+          break;
+        }
+      }
       scaffoldMessengerKey.currentState?.showSnackBar(SnackBar(
         content: Row(
           spacing: 16,
@@ -163,7 +224,14 @@ class AchievementService {
               borderRadius: BorderRadius.circular(8),
               child: SizedBox.square(
                 dimension: 48,
-                child: CardBack.values.firstWhere((back) => back.achievementLock == achievement).build(),
+                child: unlockedBack?.build() ??
+                    ColoredBox(
+                      color: Colors.white24,
+                      child: Icon(
+                        Icons.emoji_events,
+                        color: Colors.orangeAccent,
+                      ),
+                    ),
               ),
             ),
             Text('Achievement "${achievement.name}" Unlocked!'),

@@ -43,8 +43,16 @@ class AchievementDialog {
                           final tapsState = useState(0);
                           final isUnlocked =
                               saveState.achievements.contains(achievement);
+                          CardBack? unlockedCardBack;
+                          for (final back in CardBack.values) {
+                            if (back.achievementLock == achievement) {
+                              unlockedCardBack = back;
+                              break;
+                            }
+                          }
                           final (int?, int?) progress = (
-                            achievement.getCurrentProgress(saveState: saveState),
+                            achievement.getCurrentProgress(
+                                saveState: saveState),
                             achievement.getProgressMax(),
                           );
                           int? currentProgress;
@@ -76,7 +84,8 @@ class AchievementDialog {
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
                                   color: isUnlocked
-                                      ? Colors.greenAccent.withValues(alpha: 0.6)
+                                      ? Colors.greenAccent
+                                          .withValues(alpha: 0.6)
                                       : Colors.white.withValues(alpha: 0.08),
                                   width: 1.4,
                                 ),
@@ -89,11 +98,14 @@ class AchievementDialog {
                                     child: SizedBox.square(
                                       dimension: 56,
                                       child: isUnlocked
-                                          ? CardBack.values
-                                              .firstWhere((back) =>
-                                                  back.achievementLock ==
-                                                  achievement)
-                                              .build()
+                                          ? (unlockedCardBack?.build() ??
+                                              ColoredBox(
+                                                color: Colors.white24,
+                                                child: Icon(
+                                                  Icons.emoji_events,
+                                                  color: Colors.amberAccent,
+                                                ),
+                                              ))
                                           : LayoutBuilder(
                                               builder: (context, constraints) {
                                                 return Stack(

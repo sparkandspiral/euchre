@@ -27,7 +27,15 @@ enum Achievement {
   peakPerformance('Peak Performance',
       'In Tri-Peaks, achieve a streak of 15 consecutive cards.'),
   summitMaster('Summit Master',
-      'Win a Tri-Peaks game with at least 10 cards remaining in the stock.');
+      'Win a Tri-Peaks game with at least 10 cards remaining in the stock.'),
+  silkRoad('Silk Road',
+      'In Spider Solitaire, clear four suit sequences before dealing from the stock.'),
+  eightfoldMaster('Eightfold Master',
+      'Win a 4-suit Spider Solitaire game without undoing any moves.'),
+  desertRunner('Desert Runner',
+      'In Pyramid Solitaire, remove 10 pyramid cards before drawing from the stock.'),
+  sunDial('Sun Dial',
+      'Win a Pyramid Solitaire game with at least 10 cards remaining in the stock.');
 
   final String name;
   final String description;

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -11,7 +12,7 @@ class RewardedAdService {
 
   Future<void> load() async {
     if (_rewarded != null) return;
-    final adUnitId = defaultTargetPlatform == TargetPlatform.iOS
+    final adUnitId = Platform.isIOS
         ? 'ca-app-pub-8753462308649653/7504632648'
         : 'ca-app-pub-8753462308649653/8817714316';
     await RewardedAd.load(

@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:solitaire/model/save_state.dart';
 import 'package:solitaire/providers/save_state_notifier.dart';
 
 const _kRemoteConfigKey = 'games_between_ads';

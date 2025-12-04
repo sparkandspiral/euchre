@@ -307,8 +307,8 @@ class GolfSolitaire extends HookConsumerWidget {
       onTutorial: startTutorial,
       onVictory: (_, __) async {
         await ref
-            .read(achievementServiceProvider)
-            .checkGolfSolitaireCompletionAchievements(
+          .read(achievementServiceProvider)
+          .checkGolfSolitaireCompletionAchievements(
                 state: state.value, difficulty: difficulty);
         if (dailyChallenge == null) {
           await clearSnapshot();

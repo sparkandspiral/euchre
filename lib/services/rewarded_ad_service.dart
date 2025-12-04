@@ -1,72 +1,51 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 final rewardedAdServiceProvider = Provider((ref) => RewardedAdService());
 
 class RewardedAdService {
-  static const Duration _adDuration = Duration(seconds: 4);
+  RewardedAd? _rewarded;
 
-  Future<void> showRewardedAd(BuildContext context) async {
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const _RewardedAdDialog(duration: _adDuration),
-    );
-  }
-}
-
-class _RewardedAdDialog extends StatefulWidget {
-  final Duration duration;
-  const _RewardedAdDialog({required this.duration});
-
-  @override
-  State<_RewardedAdDialog> createState() => _RewardedAdDialogState();
-}
-
-class _RewardedAdDialogState extends State<_RewardedAdDialog>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  bool _completed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: widget.duration)
-      ..addStatusListener((status) {
-        if (status == AnimationStatus.completed && !_completed && mounted) {
-          _completed = true;
-          Navigator.of(context).maybePop(true);
-        }
-      })
-      ..forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Rewarded Ad'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Thanks for watching! Keep the app open while we finish the bonus.',
-          ),
-          const SizedBox(height: 16),
-          AnimatedBuilder(
-            animation: _controller,
-            builder: (context, _) => LinearProgressIndicator(
-              value: _controller.value,
-            ),
-          ),
-        ],
+  Future<void> load() async {
+    if (_rewarded != null) return;
+    final adUnitId = defaultTargetPlatform == TargetPlatform.iOS
+        ? 'ca-app-pub-8753462308649653/7504632648'
+        : 'ca-app-pub-8753462308649653/8817714316';
+    await RewardedAd.load(
+      adUnitId: adUnitId,
+      request: const AdRequest(),
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (ad) => _rewarded = ad,
+        onAdFailedToLoad: (_) => _rewarded = null,
       ),
     );
+  }
+
+  Future<bool> showRewardedAd(BuildContext context) async {
+    await load();
+    if (_rewarded == null) return false;
+
+    final completer = Completer<bool>();
+    _rewarded!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _rewarded = null;
+        load();
+        completer.complete(false);
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _rewarded = null;
+        completer.complete(false);
+      },
+    );
+
+    _rewarded!.show(onUserEarnedReward: (ad, reward) {
+      completer.complete(true);
+    });
+    return completer.future;
   }
 }

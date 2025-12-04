@@ -5,6 +5,7 @@ import 'package:solitaire/home_page.dart';
 import 'package:solitaire/providers/save_state_notifier.dart';
 import 'package:solitaire/services/audio_service.dart';
 import 'package:solitaire/services/leaderboard_service.dart';
+import 'package:solitaire/services/purchase_service.dart';
 import 'package:solitaire/utils/build_context_extensions.dart';
 import 'package:solitaire/widgets/themed_sheet.dart';
 
@@ -70,6 +71,40 @@ class SettingsDialog {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    buildCard(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Text(
+                                  'Shop',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Remove ads or stock up on hints.',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          FilledButton.icon(
+                            onPressed: () => _showShopDialog(context, ref),
+                            icon: const Icon(Icons.storefront),
+                            label: const Text('Open'),
+                          ),
+                        ],
+                      ),
+                    ),
                     buildCard(
                       child: Row(
                         children: [
@@ -331,4 +366,46 @@ class SettingsDialog {
       ),
     );
   }
+}
+
+Future<void> _showShopDialog(BuildContext context, WidgetRef ref) async {
+  final products = await ref.read(purchaseServiceProvider).loadProducts();
+  if (!context.mounted) return;
+
+  await showDialog(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text('Shop'),
+        content: products.isEmpty
+            ? const Text('No products available. Please try again later.')
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: products
+                    .map(
+                      (product) => ListTile(
+                        title: Text(product.title),
+                        subtitle: Text(product.description),
+                        trailing: Text(product.price),
+                        onTap: () => ref
+                            .read(purchaseServiceProvider)
+                            .buy(product),
+                      ),
+                    )
+                    .toList(),
+              ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                ref.read(purchaseServiceProvider).restore(),
+            child: const Text('Restore'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      );
+    },
+  );
 }

@@ -18,6 +18,7 @@ import 'package:solitaire/providers/save_state_notifier.dart';
 import 'package:solitaire/services/achievement_service.dart';
 import 'package:solitaire/services/audio_service.dart';
 import 'package:solitaire/services/daily_challenge_service.dart';
+import 'package:solitaire/services/ad_service.dart';
 import 'package:solitaire/services/rewarded_ad_service.dart';
 import 'package:solitaire/utils/build_context_extensions.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
@@ -105,6 +106,9 @@ class CardScaffold extends HookConsumerWidget {
                   config: dailyChallenge!,
                   duration: duration,
                 );
+          }
+          if (!disableAds) {
+            await ref.read(adServiceProvider).maybeShowAfterGame();
           }
         }();
       }
@@ -229,16 +233,19 @@ class CardScaffold extends HookConsumerWidget {
           if (!context.mounted) return;
 
           try {
-            await ref.read(rewardedAdServiceProvider).showRewardedAd(context);
-            await ref
-                .read(saveStateNotifierProvider.notifier)
-                .addHints(hintRewardAmount);
-            if (!context.mounted) return;
-            messenger?.showSnackBar(
-              SnackBar(
-                content: Text('You earned $hintRewardAmount additional hints.'),
-              ),
-            );
+            final rewarded =
+                await ref.read(rewardedAdServiceProvider).showRewardedAd(context);
+            if (rewarded) {
+              await ref
+                  .read(saveStateNotifierProvider.notifier)
+                  .addHints(hintRewardAmount);
+              if (!context.mounted) return;
+              messenger?.showSnackBar(
+                SnackBar(
+                  content: Text('You earned $hintRewardAmount additional hints.'),
+                ),
+              );
+            }
           } catch (error) {
             if (!context.mounted) return;
             messenger?.showSnackBar(
@@ -250,7 +257,7 @@ class CardScaffold extends HookConsumerWidget {
           return;
         }
 
-        final hint = await Future<HintSuggestion?>.sync(onHint!);
+          final hint = await Future<HintSuggestion?>.sync(onHint!);
         if (hint == null) {
           if (!context.mounted) return;
           messenger?.showSnackBar(

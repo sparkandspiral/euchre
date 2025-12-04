@@ -43,6 +43,8 @@ SaveState _$SaveStateFromJson(Map<String, dynamic> json) => SaveState(
                 ActiveGameSnapshot.fromJson(e as Map<String, dynamic>)),
           ) ??
           {},
+      adsRemoved: json['adsRemoved'] as bool? ?? false,
+      unlimitedHints: json['unlimitedHints'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$SaveStateToJson(SaveState instance) => <String, dynamic>{
@@ -63,6 +65,8 @@ Map<String, dynamic> _$SaveStateToJson(SaveState instance) => <String, dynamic>{
           .map((k, e) => MapEntry(_$GameEnumMap[k]!, e)),
       'activeGames':
           instance.activeGames.map((k, e) => MapEntry(_$GameEnumMap[k]!, e)),
+      'adsRemoved': instance.adsRemoved,
+      'unlimitedHints': instance.unlimitedHints,
     };
 
 const _$GameEnumMap = {

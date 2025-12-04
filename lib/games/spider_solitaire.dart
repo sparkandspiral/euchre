@@ -591,7 +591,7 @@ class SpiderSolitaire extends HookConsumerWidget {
       onRestart: () {
         startReference.value = DateTime.now();
         state.value =
-            (state.value.history.firstOrNull ?? state.value)
+          (state.value.history.firstOrNull ?? state.value)
                 .copyWith(usedUndo: false);
       },
       onTutorial: startTutorial,
@@ -602,8 +602,8 @@ class SpiderSolitaire extends HookConsumerWidget {
       isVictory: state.value.isVictory,
       onVictory: (_, __) async {
         await ref
-            .read(achievementServiceProvider)
-            .checkSpiderSolitaireCompletionAchievements(
+          .read(achievementServiceProvider)
+          .checkSpiderSolitaireCompletionAchievements(
                 difficulty: difficulty, state: state.value);
         if (dailyChallenge == null) {
           await clearSnapshot();

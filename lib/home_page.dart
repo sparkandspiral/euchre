@@ -307,6 +307,7 @@ class HomePage extends ConsumerWidget {
       } else if (decision == null) {
         return;
       } else {
+        if (!context.mounted) return;
         await ref
             .read(saveStateNotifierProvider.notifier)
             .clearActiveGame(game);

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:solitaire/model/achievement.dart';
 import 'package:solitaire/model/background.dart';
 import 'package:solitaire/model/card_back.dart';
+import 'package:solitaire/model/active_game_snapshot.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/save_state.dart';
@@ -97,6 +98,9 @@ class SaveStateNotifier extends _$SaveStateNotifier {
 
   Future<bool> spendHint() async {
     final saveState = await future;
+    if (saveState.unlimitedHints) {
+      return true;
+    }
     if (saveState.hints <= 0) {
       return false;
     }
@@ -114,6 +118,56 @@ class SaveStateNotifier extends _$SaveStateNotifier {
 
   Future<void> deleteAllData() async {
     await _saveState(SaveState.empty());
+  }
+
+  Future<void> setAdsRemoved() async {
+    final saveState = await future;
+    await _saveState(saveState.copyWith(adsRemoved: true));
+  }
+
+  Future<void> setUnlimitedHints() async {
+    final saveState = await future;
+    await _saveState(saveState.copyWith(unlimitedHints: true));
+  }
+
+  Future<void> saveDailyCompletion({
+    required Game game,
+    required int puzzleNumber,
+    required Duration duration,
+    bool submitted = false,
+  }) async {
+    final saveState = await future;
+    await _saveState(saveState.withDailyCompletion(
+      game: game,
+      puzzleNumber: puzzleNumber,
+      duration: duration,
+      submitted: submitted,
+    ));
+  }
+
+  Future<void> markDailySubmission({
+    required Game game,
+    required int puzzleNumber,
+  }) async {
+    final saveState = await future;
+    await _saveState(saveState.withDailySubmission(
+      game: game,
+      puzzleNumber: puzzleNumber,
+    ));
+  }
+
+  Future<void> saveActiveGameSnapshot(
+      ActiveGameSnapshot snapshot) async {
+    final saveState = await future;
+    await _saveState(saveState.withActiveGame(snapshot));
+  }
+
+  Future<void> clearActiveGame(Game game) async {
+    final saveState = await future;
+    if (!saveState.activeGames.containsKey(game)) {
+      return;
+    }
+    await _saveState(saveState.withoutActiveGame(game));
   }
 
   Future<void> _saveState(SaveState state) async {

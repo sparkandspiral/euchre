@@ -9,7 +9,6 @@ String _describeValue(SuitedCardValue value) => switch (value) {
       QueenSuitedCardValue() => 'Q',
       KingSuitedCardValue() => 'K',
       AceSuitedCardValue() => 'A',
-      _ => value.toString(),
     };
 
 String _describeSuitSymbol(CardSuit suit) => switch (suit) {

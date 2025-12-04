@@ -2,10 +2,12 @@ import 'package:json_annotation/json_annotation.dart';
 import 'package:solitaire/model/achievement.dart';
 import 'package:solitaire/model/background.dart';
 import 'package:solitaire/model/card_back.dart';
+import 'package:solitaire/model/daily_challenge.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/difficulty_game_state.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/hint.dart';
+import 'package:solitaire/model/active_game_snapshot.dart';
 import 'package:solitaire/model/game_state.dart';
 import 'package:utils/utils.dart';
 
@@ -41,6 +43,18 @@ class SaveState {
   @JsonKey(defaultValue: defaultHintCount)
   final int hints;
 
+  @JsonKey(defaultValue: {})
+  final Map<Game, DailyChallengeProgress> dailyChallengeProgress;
+
+  @JsonKey(defaultValue: {})
+  final Map<Game, ActiveGameSnapshot> activeGames;
+
+  @JsonKey(defaultValue: false)
+  final bool adsRemoved;
+
+  @JsonKey(defaultValue: false)
+  final bool unlimitedHints;
+
   const SaveState({
     required this.gameStates,
     required this.achievements,
@@ -52,6 +66,10 @@ class SaveState {
     required this.volume,
     required this.enableAutoMove,
     required this.hints,
+    required this.dailyChallengeProgress,
+    required this.activeGames,
+    required this.adsRemoved,
+    required this.unlimitedHints,
   });
 
   const SaveState.empty()
@@ -64,7 +82,11 @@ class SaveState {
         cardBack = CardBack.redStripes,
         volume = 1,
         enableAutoMove = true,
-        hints = defaultHintCount;
+        hints = defaultHintCount,
+        dailyChallengeProgress = const {},
+        activeGames = const {},
+        adsRemoved = false,
+        unlimitedHints = false;
 
   factory SaveState.fromJson(Map<String, dynamic> json) =>
       _$SaveStateFromJson(json);
@@ -102,6 +124,61 @@ class SaveState {
       );
 
   SaveState withCloseOrRestart() => copyWith(winStreak: 0);
+
+  SaveState withDailyCompletion({
+    required Game game,
+    required int puzzleNumber,
+    required Duration duration,
+    bool submitted = false,
+  }) {
+    final current = dailyChallengeProgress[game];
+    final isSamePuzzle = current?.lastPuzzleNumber == puzzleNumber;
+    final newCentiseconds = duration.inMilliseconds ~/ 10;
+    final lastBest = current?.lastBestTimeCs;
+    final bestForPuzzle =
+        isSamePuzzle && lastBest != null && lastBest < newCentiseconds
+            ? lastBest
+            : newCentiseconds;
+    final updated = (current ?? const DailyChallengeProgress()).copyWith(
+      lastPuzzleNumber: puzzleNumber,
+      lastCompletedAt: DateTime.now().toUtc(),
+      lastBestTimeCs: bestForPuzzle,
+      lastSubmittedPuzzleNumber:
+          submitted ? puzzleNumber : current?.lastSubmittedPuzzleNumber,
+    );
+
+    return copyWith(
+      dailyChallengeProgress: {
+        ...dailyChallengeProgress,
+        game: updated,
+      },
+    );
+  }
+
+  SaveState withDailySubmission({required Game game, required int puzzleNumber}) {
+    final current = dailyChallengeProgress[game];
+    final updated = (current ?? const DailyChallengeProgress()).copyWith(
+      lastSubmittedPuzzleNumber: puzzleNumber,
+    );
+
+    return copyWith(
+      dailyChallengeProgress: {
+        ...dailyChallengeProgress,
+        game: updated,
+      },
+    );
+  }
+
+  SaveState withActiveGame(ActiveGameSnapshot snapshot) => copyWith(
+        activeGames: {
+          ...activeGames,
+          snapshot.game: snapshot,
+        },
+      );
+
+  SaveState withoutActiveGame(Game game) => copyWith(
+        activeGames: {...activeGames}..remove(game),
+      );
 
   SaveState withBackground({required Background background}) =>
       copyWith(background: background);
@@ -156,6 +233,10 @@ class SaveState {
     double? volume,
     bool? enableAutoMove,
     int? hints,
+    Map<Game, DailyChallengeProgress>? dailyChallengeProgress,
+    Map<Game, ActiveGameSnapshot>? activeGames,
+    bool? adsRemoved,
+    bool? unlimitedHints,
   }) {
     return SaveState(
       gameStates: gameStates ?? this.gameStates,
@@ -169,6 +250,11 @@ class SaveState {
       volume: volume ?? this.volume,
       enableAutoMove: enableAutoMove ?? this.enableAutoMove,
       hints: hints ?? this.hints,
+      dailyChallengeProgress:
+          dailyChallengeProgress ?? this.dailyChallengeProgress,
+      activeGames: activeGames ?? this.activeGames,
+      adsRemoved: adsRemoved ?? this.adsRemoved,
+      unlimitedHints: unlimitedHints ?? this.unlimitedHints,
     );
   }
 }

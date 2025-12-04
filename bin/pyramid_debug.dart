@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'package:solitaire/games/pyramid_solitaire.dart';
 import 'package:solitaire/model/difficulty.dart';
 

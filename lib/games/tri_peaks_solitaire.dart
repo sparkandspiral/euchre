@@ -5,6 +5,7 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:solitaire/model/daily_challenge.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/immutable_history.dart';
@@ -42,8 +43,10 @@ class TriPeaksSolitaireState {
   static TriPeaksSolitaireState getInitialState({
     required bool startWithWaste,
     required bool canRollover,
+    int? shuffleSeed,
   }) {
-    var deck = SuitedCard.deck.shuffled();
+    final random = shuffleSeed == null ? Random() : Random(shuffleSeed);
+    var deck = List.of(SuitedCard.deck)..shuffle(random);
 
     // Classic Tri-Peaks layout: 28 cards in 4 rows forming 3 peaks
     // Row 0 (peaks): 3 cards (indices 0, 1, 2)
@@ -218,17 +221,20 @@ class TriPeaksSolitaireState {
 class TriPeaksSolitaire extends HookConsumerWidget {
   final Difficulty difficulty;
   final bool startWithTutorial;
+  final DailyChallengeConfig? dailyChallenge;
 
   const TriPeaksSolitaire({
     super.key,
     required this.difficulty,
     this.startWithTutorial = false,
+    this.dailyChallenge,
   });
 
   TriPeaksSolitaireState get initialState =>
       TriPeaksSolitaireState.getInitialState(
         startWithWaste: difficulty.index >= Difficulty.royal.index,
         canRollover: difficulty != Difficulty.ace,
+        shuffleSeed: dailyChallenge?.shuffleSeed,
       );
 
   @override
@@ -282,6 +288,7 @@ class TriPeaksSolitaire extends HookConsumerWidget {
     return CardScaffold(
       game: Game.triPeaks,
       difficulty: difficulty,
+      dailyChallenge: dailyChallenge,
       onNewGame: () => state.value = initialState,
       onRestart: () =>
           state.value = state.value.history.firstOrNull ?? state.value,
@@ -291,7 +298,7 @@ class TriPeaksSolitaire extends HookConsumerWidget {
       onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
       onTutorial: startTutorial,
-      onVictory: () => ref
+      onVictory: (_, __) => ref
           .read(achievementServiceProvider)
           .checkTriPeaksSolitaireCompletionAchievements(
               state: state.value, difficulty: difficulty),

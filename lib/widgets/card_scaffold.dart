@@ -10,18 +10,21 @@ import 'package:provider/provider.dart';
 import 'package:solitaire/context/card_game_context.dart';
 import 'package:solitaire/home_page.dart';
 import 'package:solitaire/model/card_back.dart';
+import 'package:solitaire/model/daily_challenge.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/hint.dart';
 import 'package:solitaire/providers/save_state_notifier.dart';
 import 'package:solitaire/services/achievement_service.dart';
 import 'package:solitaire/services/audio_service.dart';
+import 'package:solitaire/services/daily_challenge_service.dart';
 import 'package:solitaire/services/rewarded_ad_service.dart';
 import 'package:solitaire/utils/build_context_extensions.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
 import 'package:solitaire/utils/duration_extensions.dart';
 import 'package:utils/utils.dart';
 import 'package:solitaire/widgets/themed_sheet.dart';
+import 'package:solitaire/widgets/daily_leaderboard_sheet.dart';
 
 class CardScaffold extends HookConsumerWidget {
   final Game game;
@@ -36,8 +39,12 @@ class CardScaffold extends HookConsumerWidget {
   final Function()? onUndo;
   final FutureOr<HintSuggestion?> Function()? onHint;
 
-  final FutureOr Function()? onVictory;
+  final FutureOr<void> Function(BuildContext context, Duration duration)?
+      onVictory;
   final bool isVictory;
+  final DailyChallengeConfig? dailyChallenge;
+  final Duration initialElapsed;
+  final bool disableAds;
 
   const CardScaffold({
     super.key,
@@ -51,6 +58,9 @@ class CardScaffold extends HookConsumerWidget {
     this.onHint,
     this.onVictory,
     this.isVictory = false,
+    this.dailyChallenge,
+    this.initialElapsed = Duration.zero,
+    this.disableAds = false,
   });
 
   @override
@@ -59,7 +69,8 @@ class CardScaffold extends HookConsumerWidget {
     final isPreview = cardGameContext?.isPreview ?? false;
 
     final isHintProcessing = useState(false);
-    final startTimeState = useState(DateTime.now());
+    final startTimeState =
+        useState(DateTime.now().subtract(initialElapsed));
     final currentTimeState = useState(DateTime.now());
 
     final saveState = ref.watch(saveStateNotifierProvider).valueOrNull;
@@ -71,11 +82,30 @@ class CardScaffold extends HookConsumerWidget {
             currentTimeState.value.difference(startTimeState.value);
         () async {
           ref.read(audioServiceProvider).playWin();
-          await onVictory?.call();
+          await onVictory?.call(context, duration);
+          if (!context.mounted) return;
           await ref.read(saveStateNotifierProvider.notifier).saveGameCompleted(
-              game: game, difficulty: difficulty, duration: duration);
-          ref.read(achievementServiceProvider).checkGameCompletionAchievements(
-              game: game, difficulty: difficulty, duration: duration);
+                game: game,
+                difficulty: difficulty,
+                duration: duration,
+              );
+          if (!context.mounted) return;
+          await ref
+              .read(achievementServiceProvider)
+              .checkGameCompletionAchievements(
+                game: game,
+                difficulty: difficulty,
+                duration: duration,
+              );
+          if (dailyChallenge != null) {
+            if (!context.mounted) return;
+            await ref.read(dailyChallengeServiceProvider).handleVictory(
+                  context: context,
+                  game: game,
+                  config: dailyChallenge!,
+                  duration: duration,
+                );
+          }
         }();
       }
       return null;
@@ -196,18 +226,21 @@ class CardScaffold extends HookConsumerWidget {
           if (!shouldWatchAd) {
             return;
           }
+          if (!context.mounted) return;
 
           try {
             await ref.read(rewardedAdServiceProvider).showRewardedAd(context);
             await ref
                 .read(saveStateNotifierProvider.notifier)
                 .addHints(hintRewardAmount);
+            if (!context.mounted) return;
             messenger?.showSnackBar(
               SnackBar(
                 content: Text('You earned $hintRewardAmount additional hints.'),
               ),
             );
           } catch (error) {
+            if (!context.mounted) return;
             messenger?.showSnackBar(
               SnackBar(
                 content: Text('Unable to finish the ad: $error'),
@@ -219,6 +252,7 @@ class CardScaffold extends HookConsumerWidget {
 
         final hint = await Future<HintSuggestion?>.sync(onHint!);
         if (hint == null) {
+          if (!context.mounted) return;
           messenger?.showSnackBar(
             const SnackBar(
               content:
@@ -231,12 +265,14 @@ class CardScaffold extends HookConsumerWidget {
         final didSpendHint =
             await ref.read(saveStateNotifierProvider.notifier).spendHint();
         if (!didSpendHint) {
+          if (!context.mounted) return;
           messenger?.showSnackBar(
             const SnackBar(content: Text('No hints available.')),
           );
           return;
         }
 
+        if (!context.mounted) return;
         final detail = hint.detail;
         final text = detail == null ? hint.message : '${hint.message}\n$detail';
         messenger?.showSnackBar(SnackBar(content: Text(text)));
@@ -497,6 +533,18 @@ class CardScaffold extends HookConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (dailyChallenge != null) ...[
+                        Text(
+                          'Daily Puzzle Complete!',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          dailyChallenge!.formattedLabel,
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                        SizedBox(height: 12),
+                      ],
                       Text(
                         'You Won!',
                         style: Theme.of(context).textTheme.headlineLarge,
@@ -537,6 +585,16 @@ class CardScaffold extends HookConsumerWidget {
                             label: Text('Close'),
                             icon: Icon(Icons.close),
                           ),
+                          if (dailyChallenge != null)
+                            ElevatedButton.icon(
+                              onPressed: () => DailyLeaderboardSheet.show(
+                                context,
+                                game: game,
+                                config: dailyChallenge!,
+                              ),
+                              label: Text('View Leaderboard'),
+                              icon: Icon(Icons.leaderboard),
+                            ),
                         ],
                       ),
                     ],

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:equatable/equatable.dart';
+import 'package:solitaire/model/daily_challenge.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/immutable_history.dart';
@@ -59,8 +60,10 @@ class PyramidSolitaireState {
     required int drawPerTap,
     required bool buryAces,
     required bool startWithWasteCard,
+    int? shuffleSeed,
   }) {
-    var suitedDeck = SuitedCard.deck.shuffled();
+    final random = shuffleSeed == null ? Random() : Random(shuffleSeed);
+    var suitedDeck = List.of(SuitedCard.deck)..shuffle(random);
 
     // Optionally bury Aces at bottom of stock to increase difficulty similar to Ace mode patterns
     if (buryAces) {
@@ -285,9 +288,14 @@ class PyramidSolitaireState {
 class PyramidSolitaire extends HookConsumerWidget {
   final Difficulty difficulty;
   final bool startWithTutorial;
+  final DailyChallengeConfig? dailyChallenge;
 
-  const PyramidSolitaire(
-      {super.key, required this.difficulty, this.startWithTutorial = false});
+  const PyramidSolitaire({
+    super.key,
+    required this.difficulty,
+    this.startWithTutorial = false,
+    this.dailyChallenge,
+  });
 
   int get drawPerTap => 1; // standard pyramid draws 1 to waste
 
@@ -296,6 +304,7 @@ class PyramidSolitaire extends HookConsumerWidget {
         drawPerTap: drawPerTap,
         buryAces: difficulty == Difficulty.ace,
         startWithWasteCard: difficulty.index >= Difficulty.royal.index,
+        shuffleSeed: dailyChallenge?.shuffleSeed,
       );
 
   @override
@@ -356,6 +365,7 @@ class PyramidSolitaire extends HookConsumerWidget {
     return CardScaffold(
       game: Game.pyramid,
       difficulty: difficulty,
+      dailyChallenge: dailyChallenge,
       onNewGame: () => state.value = initialState,
       onRestart: () => state.value =
           (state.value.history.firstOrNull ?? state.value)
@@ -366,7 +376,7 @@ class PyramidSolitaire extends HookConsumerWidget {
           : () => state.value = state.value.withUndo(),
       onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
-      onVictory: () => ref
+      onVictory: (_, __) => ref
           .read(achievementServiceProvider)
           .checkPyramidSolitaireCompletionAchievements(state: state.value),
       builder: (context, constraints, cardBack, autoMoveEnabled, gameKey) {
@@ -534,8 +544,8 @@ class PyramidSolitaire extends HookConsumerWidget {
             height: tableauHeight,
             child: Stack(
               clipBehavior: Clip.none,
-              children: positionedCards,
               fit: StackFit.passthrough,
+              children: positionedCards,
             ),
           );
         }
@@ -602,9 +612,9 @@ class PyramidSolitaire extends HookConsumerWidget {
               vertical: spacing * 1.2,
             ),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.18),
+              color: Colors.black.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.white.withOpacity(0.12)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -631,7 +641,7 @@ class PyramidSolitaire extends HookConsumerWidget {
                             vertical: spacing * 0.6,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
+                            color: Colors.white.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -699,13 +709,13 @@ class PyramidSolitaire extends HookConsumerWidget {
               final shadows = <BoxShadow>[
                 if (isSelected)
                   BoxShadow(
-                    color: accentColor.withOpacity(0.45),
+                    color: accentColor.withValues(alpha: 0.45),
                     blurRadius: 18,
                     spreadRadius: 1.2,
                   ),
                 if (showDepthShadow)
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.35),
+                    color: Colors.black.withValues(alpha: 0.35),
                     blurRadius: 10,
                     offset: Offset(0, 6),
                   ),

@@ -65,8 +65,7 @@ class StatsDialog {
                             padding: EdgeInsets.only(bottom: 16),
                             child: _GameStatsCard(stats: gameStat),
                           ),
-                        )
-                        .toList(),
+                        ),
                   ],
                 ),
               );

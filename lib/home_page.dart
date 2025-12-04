@@ -295,6 +295,7 @@ class HomePage extends ConsumerWidget {
     if (snapshot != null && !snapshot.isDaily) {
       final decision = await _showResumeDialog(context, snapshot);
       if (decision == _ResumeChoice.resume) {
+        if (!context.mounted) return;
         _startGame(
           context: context,
           ref: ref,
@@ -314,6 +315,7 @@ class HomePage extends ConsumerWidget {
       }
     }
 
+    if (!context.mounted) return;
     _showDifficultySelector(
       rootContext: context,
       ref: ref,

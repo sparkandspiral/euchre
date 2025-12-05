@@ -193,7 +193,7 @@ class HomePage extends ConsumerWidget {
         title: Row(
           children: [
             Text(
-              'Solitaire Collection',
+              'Solitaire Pro Collection',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,

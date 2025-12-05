@@ -98,7 +98,12 @@ class _DailyLeaderboardSheetState
       return ListView(
         children: const [
           SizedBox(height: 48),
-          Center(child: Text('Unable to load leaderboard data.')),
+          Center(
+            child: Text(
+              'Unable to load leaderboard data.',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
         ],
       );
     }
@@ -123,7 +128,12 @@ class _DailyLeaderboardSheetState
               ? ListView(
                   children: const [
                     SizedBox(height: 48),
-                    Center(child: Text('No scores yet. Be the first!')),
+                    Center(
+                      child: Text(
+                        'No scores yet. Be the first!',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
                   ],
                 )
               : ListView.separated(
@@ -138,6 +148,7 @@ class _DailyLeaderboardSheetState
                       leading: Text(
                         '${score.rank}.',
                         style: TextStyle(
+                          color: Colors.white,
                           fontWeight:
                               isPlayer ? FontWeight.bold : FontWeight.normal,
                         ),
@@ -145,13 +156,17 @@ class _DailyLeaderboardSheetState
                       title: Text(
                         score.displayName,
                         style: TextStyle(
+                          color: Colors.white,
                           fontWeight:
                               isPlayer ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),
                       trailing: Text(
                         _formatScore(score),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       tileColor: isPlayer
                           ? Colors.white.withValues(alpha: 0.08)

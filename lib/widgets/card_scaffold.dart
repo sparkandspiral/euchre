@@ -168,6 +168,7 @@ class CardScaffold extends HookConsumerWidget {
         backgroundColor: Colors.transparent,
         builder: (sheetContext) => _InGameMenuSheet(
           gameTitle: game.title,
+          isDailyChallenge: dailyChallenge != null,
           onTutorial: () {
             Navigator.of(sheetContext).pop();
             onTutorial();
@@ -573,14 +574,15 @@ class CardScaffold extends HookConsumerWidget {
                         runSpacing: 8,
                         alignment: WrapAlignment.center,
                         children: [
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              startTimeState.value = DateTime.now();
-                              onNewGame();
-                            },
-                            label: Text('New Game'),
-                            icon: Icon(Icons.star_border),
-                          ),
+                          if (dailyChallenge == null)
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                startTimeState.value = DateTime.now();
+                                onNewGame();
+                              },
+                              label: Text('New Game'),
+                              icon: Icon(Icons.star_border),
+                            ),
                           ElevatedButton.icon(
                             onPressed: () => restartGame(),
                             label: Text('Restart Game'),
@@ -618,6 +620,7 @@ class CardScaffold extends HookConsumerWidget {
 
 class _InGameMenuSheet extends StatelessWidget {
   final String gameTitle;
+  final bool isDailyChallenge;
   final VoidCallback onTutorial;
   final VoidCallback onNewGame;
   final VoidCallback onRestart;
@@ -625,6 +628,7 @@ class _InGameMenuSheet extends StatelessWidget {
 
   const _InGameMenuSheet({
     required this.gameTitle,
+    required this.isDailyChallenge,
     required this.onTutorial,
     required this.onNewGame,
     required this.onRestart,
@@ -645,12 +649,13 @@ class _InGameMenuSheet extends StatelessWidget {
                 'Replay the guided walkthrough to refresh the core mechanics.',
             onTap: onTutorial,
           ),
-          SheetOptionTile(
-            icon: Icons.star_border,
-            title: 'New Game',
-            description: 'Deal a fresh layout with newly shuffled cards.',
-            onTap: onNewGame,
-          ),
+          if (!isDailyChallenge)
+            SheetOptionTile(
+              icon: Icons.star_border,
+              title: 'New Game',
+              description: 'Deal a fresh layout with newly shuffled cards.',
+              onTap: onNewGame,
+            ),
           SheetOptionTile(
             icon: Icons.restart_alt,
             title: 'Restart Game',

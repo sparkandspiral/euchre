@@ -16,12 +16,12 @@ enum Achievement {
   stackTheDeck(
       'Stack the Deck', 'Win 3 games in a row without restarting a game.'),
   deckWhisperer('Deck Whisperer',
-      'Win a Solitaire game without cycling through the draw pile.'),
+      'Win a Klondike Solitaire game without cycling through the draw pile.'),
   aceUpYourSleeve('Ace Up Your Sleeve', 'Complete all games on Hard.'),
   birdie('Birdie',
       'Win a Hard Golf Solitaire game with at least 1 card left in the draw pile.'),
   cleanSweep(
-      'Clean Sweep', 'Win a Hard Solitaire game without undoing any moves.'),
+      'Clean Sweep', 'Win a Hard Klondike Solitaire game without undoing any moves.'),
   perfectPlanning('Perfect Planning',
       'Win a Hard Free Cell game without undoing any moves.'),
   peakPerformance('Peak Performance',

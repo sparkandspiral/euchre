@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:solitaire/model/daily_challenge.dart';
+import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/providers/save_state_notifier.dart';
 import 'package:solitaire/services/leaderboard_service.dart';
@@ -19,11 +20,16 @@ class DailyChallengeService {
     final startOfYear = DateTime(normalized.year);
     final puzzleNumber = normalized.difference(startOfYear).inDays + 1;
     final seed = _seedFor(normalized, game);
+    // Set difficulty: Easy for all games, Medium for Klondike
+    final difficulty = game == Game.klondike 
+        ? Difficulty.royal 
+        : Difficulty.classic;
     return DailyChallengeConfig(
       game: game,
       puzzleNumber: puzzleNumber,
       date: normalized,
       shuffleSeed: seed,
+      difficulty: difficulty,
     );
   }
 

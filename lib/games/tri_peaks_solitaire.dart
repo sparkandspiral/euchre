@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:card_game/card_game.dart';
@@ -5,6 +6,8 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:solitaire/model/active_game_snapshot.dart';
+import 'package:solitaire/model/daily_challenge.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/immutable_history.dart';
@@ -14,9 +17,11 @@ import 'package:solitaire/services/audio_service.dart';
 import 'package:solitaire/styles/playing_card_style.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
 import 'package:solitaire/utils/card_description.dart';
+import 'package:solitaire/utils/suited_card_codec.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
 import 'package:utils/utils.dart';
+import 'package:solitaire/providers/save_state_notifier.dart';
 
 class TriPeaksSolitaireState {
   final List<List<SuitedCard?>>
@@ -42,8 +47,10 @@ class TriPeaksSolitaireState {
   static TriPeaksSolitaireState getInitialState({
     required bool startWithWaste,
     required bool canRollover,
+    int? shuffleSeed,
   }) {
-    var deck = SuitedCard.deck.shuffled();
+    final random = shuffleSeed == null ? Random() : Random(shuffleSeed);
+    var deck = List.of(SuitedCard.deck)..shuffle(random);
 
     // Classic Tri-Peaks layout: 28 cards in 4 rows forming 3 peaks
     // Row 0 (peaks): 3 cards (indices 0, 1, 2)
@@ -84,6 +91,44 @@ class TriPeaksSolitaireState {
       streak: 0,
       longestStreak: 0,
       canRollover: canRollover,
+      history: const ImmutableHistory.empty(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'tableau': tableau
+            .map((row) => row
+                .map((card) => card == null ? null : encodeSuitedCard(card))
+                .toList())
+            .toList(),
+        'stock': stock.map(encodeSuitedCard).toList(),
+        'waste': waste.map(encodeSuitedCard).toList(),
+        'streak': streak,
+        'longestStreak': longestStreak,
+        'canRollover': canRollover,
+      };
+
+  factory TriPeaksSolitaireState.fromJson(Map<String, dynamic> json) {
+    List<List<SuitedCard?>> decodeTableau(List<dynamic> data) => data
+        .map<List<SuitedCard?>>((row) => (row as List)
+            .map<SuitedCard?>((card) => card == null
+                ? null
+                : decodeSuitedCard(
+                    Map<String, dynamic>.from(card as Map<dynamic, dynamic>)))
+            .toList())
+        .toList();
+    List<SuitedCard> decodeList(List<dynamic> data) => data
+        .map((card) => decodeSuitedCard(
+            Map<String, dynamic>.from(card as Map<dynamic, dynamic>)))
+        .toList();
+
+    return TriPeaksSolitaireState(
+      tableau: decodeTableau(json['tableau'] as List<dynamic>),
+      stock: decodeList(json['stock'] as List<dynamic>),
+      waste: decodeList(json['waste'] as List<dynamic>),
+      streak: json['streak'] as int? ?? 0,
+      longestStreak: json['longestStreak'] as int? ?? 0,
+      canRollover: json['canRollover'] as bool? ?? true,
       history: const ImmutableHistory.empty(),
     );
   }
@@ -218,22 +263,64 @@ class TriPeaksSolitaireState {
 class TriPeaksSolitaire extends HookConsumerWidget {
   final Difficulty difficulty;
   final bool startWithTutorial;
+  final DailyChallengeConfig? dailyChallenge;
+  final ActiveGameSnapshot? snapshot;
 
   const TriPeaksSolitaire({
     super.key,
     required this.difficulty,
     this.startWithTutorial = false,
+    this.dailyChallenge,
+    this.snapshot,
   });
 
-  TriPeaksSolitaireState get initialState =>
+  TriPeaksSolitaireState get defaultInitialState =>
       TriPeaksSolitaireState.getInitialState(
         startWithWaste: difficulty.index >= Difficulty.royal.index,
         canRollover: difficulty != Difficulty.ace,
+        shuffleSeed: dailyChallenge?.shuffleSeed,
       );
+
+  TriPeaksSolitaireState get initialState {
+    if (dailyChallenge != null) return defaultInitialState;
+    if (snapshot != null) {
+      try {
+        return TriPeaksSolitaireState.fromJson(snapshot!.state);
+      } catch (_) {
+        return defaultInitialState;
+      }
+    }
+    return defaultInitialState;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = useState(initialState);
+    final startReference = useState<DateTime>(
+      DateTime.now().subtract(
+        Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      ),
+    );
+    final saveStateNotifier = ref.read(saveStateNotifierProvider.notifier);
+
+    Future<void> persistSnapshot() async {
+      if (dailyChallenge != null || state.value.isVictory) return;
+      final activeSnapshot = ActiveGameSnapshot(
+        game: Game.triPeaks,
+        difficulty: difficulty,
+        isDaily: false,
+        shuffleSeed: null,
+        state: state.value.toJson(),
+        updatedAt: DateTime.now(),
+        elapsedMilliseconds:
+            DateTime.now().difference(startReference.value).inMilliseconds,
+      );
+      await saveStateNotifier.saveActiveGameSnapshot(activeSnapshot);
+    }
+
+    Future<void> clearSnapshot() =>
+        saveStateNotifier.clearActiveGame(Game.triPeaks);
+
     useOnListenableChange(
       state,
       () => ref
@@ -279,22 +366,47 @@ class TriPeaksSolitaire extends HookConsumerWidget {
       return null;
     });
 
+    useOnListenableChange(
+      state,
+      () {
+        if (!state.value.isVictory) {
+          persistSnapshot();
+        }
+      },
+    );
+
     return CardScaffold(
       game: Game.triPeaks,
       difficulty: difficulty,
-      onNewGame: () => state.value = initialState,
-      onRestart: () =>
-          state.value = state.value.history.firstOrNull ?? state.value,
+      dailyChallenge: dailyChallenge,
+      initialElapsed:
+          Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      onNewGame: () {
+        if (dailyChallenge == null) {
+          unawaited(clearSnapshot());
+        }
+        startReference.value = DateTime.now();
+        state.value = defaultInitialState;
+      },
+      onRestart: () {
+        startReference.value = DateTime.now();
+        state.value = state.value.history.firstOrNull ?? state.value;
+      },
       onUndo: state.value.history.isEmpty
           ? null
           : () => state.value = state.value.withUndo(),
       onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
       onTutorial: startTutorial,
-      onVictory: () => ref
-          .read(achievementServiceProvider)
-          .checkTriPeaksSolitaireCompletionAchievements(
-              state: state.value, difficulty: difficulty),
+      onVictory: (_, __) async {
+        await ref
+            .read(achievementServiceProvider)
+            .checkTriPeaksSolitaireCompletionAchievements(
+                state: state.value, difficulty: difficulty);
+        if (dailyChallenge == null) {
+          await clearSnapshot();
+        }
+      },
       builder: (context, constraints, cardBack, autoMoveEnabled, gameKey) {
         final axis = constraints.largestAxis;
         final minSize = constraints.smallest.longestSide;

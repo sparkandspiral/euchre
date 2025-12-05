@@ -4,6 +4,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:solitaire/home_page.dart';
 import 'package:solitaire/providers/save_state_notifier.dart';
 import 'package:solitaire/services/audio_service.dart';
+import 'package:solitaire/services/leaderboard_service.dart';
+import 'package:solitaire/services/purchase_service.dart';
 import 'package:solitaire/utils/build_context_extensions.dart';
 import 'package:solitaire/widgets/themed_sheet.dart';
 
@@ -25,6 +27,21 @@ class SettingsDialog {
           return HookBuilder(
             builder: (context) {
               final volumeState = useState(saveState.volume);
+              final displayNameState = useState('');
+              useEffect(() {
+                var cancelled = false;
+                ref
+                    .read(leaderboardServiceProvider)
+                    .getStoredDisplayName()
+                    .then((value) {
+                  if (!cancelled && value != null) {
+                    displayNameState.value = value;
+                  }
+                });
+                return () {
+                  cancelled = true;
+                };
+              }, const []);
               Widget buildCard({
                 required Widget child,
                 Color? borderColor,
@@ -54,6 +71,124 @@ class SettingsDialog {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    buildCard(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Text(
+                                  'Shop',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Remove ads or stock up on hints.',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          FilledButton.icon(
+                            onPressed: () => _showShopDialog(context, ref),
+                            icon: const Icon(Icons.storefront),
+                            label: const Text('Open'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    buildCard(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Display Name',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  displayNameState.value.isEmpty
+                                      ? 'Set a name to appear on leaderboards.'
+                                      : displayNameState.value,
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          FilledButton(
+                            onPressed: () async {
+                              final controller = TextEditingController(
+                                  text: displayNameState.value);
+                              final newName = await showDialog<String>(
+                                context: context,
+                                builder: (dialogContext) {
+                                  return AlertDialog(
+                                    title: Text('Display Name'),
+                                    content: TextField(
+                                      controller: controller,
+                                      autofocus: true,
+                                      maxLength: 25,
+                                      decoration: InputDecoration(
+                                        hintText: 'Enter display name',
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.of(dialogContext).pop(),
+                                        child: Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.of(
+                                                dialogContext)
+                                            .pop(controller.text.trim()),
+                                        child: Text('Save'),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
+                              if (newName == null ||
+                                  newName.trim().isEmpty ||
+                                  !context.mounted) {
+                                return;
+                              }
+                              final result = await ref
+                                  .read(leaderboardServiceProvider)
+                                  .updateDisplayName(context, newName.trim());
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(result.message)),
+                              );
+                              if (result.success) {
+                                displayNameState.value = newName.trim();
+                              }
+                            },
+                            child: Text(displayNameState.value.isEmpty
+                                ? 'Set Name'
+                                : 'Change'),
+                          ),
+                        ],
+                      ),
+                    ),
                     buildCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,6 +337,10 @@ class SettingsDialog {
                                 await ref
                                     .read(saveStateNotifierProvider.notifier)
                                     .deleteAllData();
+                                if (!sheetContext.mounted ||
+                                    !rootContext.mounted) {
+                                  return;
+                                }
                                 navigator.pop();
                                 rootContext.pushReplacement(() => HomePage());
                               }
@@ -227,4 +366,46 @@ class SettingsDialog {
       ),
     );
   }
+}
+
+Future<void> _showShopDialog(BuildContext context, WidgetRef ref) async {
+  final products = await ref.read(purchaseServiceProvider).loadProducts();
+  if (!context.mounted) return;
+
+  await showDialog(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text('Shop'),
+        content: products.isEmpty
+            ? const Text('No products available. Please try again later.')
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: products
+                    .map(
+                      (product) => ListTile(
+                        title: Text(product.title),
+                        subtitle: Text(product.description),
+                        trailing: Text(product.price),
+                        onTap: () => ref
+                            .read(purchaseServiceProvider)
+                            .buy(product),
+                      ),
+                    )
+                    .toList(),
+              ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                ref.read(purchaseServiceProvider).restore(),
+            child: const Text('Restore'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      );
+    },
+  );
 }

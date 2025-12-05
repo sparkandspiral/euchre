@@ -12,71 +12,134 @@ import 'package:solitaire/games/solitaire.dart';
 import 'package:solitaire/games/pyramid_solitaire.dart';
 import 'package:solitaire/games/spider_solitaire.dart';
 import 'package:solitaire/games/tri_peaks_solitaire.dart';
+import 'package:solitaire/model/active_game_snapshot.dart';
+import 'package:solitaire/model/daily_challenge.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/providers/save_state_notifier.dart';
+import 'package:solitaire/services/daily_challenge_service.dart';
 import 'package:solitaire/styles/game_visuals.dart';
 import 'package:solitaire/utils/build_context_extensions.dart';
 import 'package:solitaire/widgets/themed_sheet.dart';
 
+typedef GameWidgetBuilder = Widget Function(
+  Difficulty difficulty,
+  bool startWithTutorial, {
+  DailyChallengeConfig? dailyChallenge,
+  ActiveGameSnapshot? snapshot,
+});
+
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
-  Map<Game, Widget Function(Difficulty, bool startWithTutorial)>
-      get gameBuilders => {
-            Game.klondike: (Difficulty difficulty, bool startWithTutorial) =>
+  Map<Game, GameWidgetBuilder> get gameBuilders => {
+        Game.klondike: (difficulty, startWithTutorial,
+                {DailyChallengeConfig? dailyChallenge,
+                ActiveGameSnapshot? snapshot}) =>
                 Solitaire(
                   difficulty: difficulty,
                   startWithTutorial: startWithTutorial,
+                  dailyChallenge: dailyChallenge,
+                  snapshot: snapshot,
                 ),
-            Game.spider: (Difficulty difficulty, bool startWithTutorial) =>
+        Game.spider: (difficulty, startWithTutorial,
+                {DailyChallengeConfig? dailyChallenge,
+                ActiveGameSnapshot? snapshot}) =>
                 SpiderSolitaire(
                   difficulty: difficulty,
                   startWithTutorial: startWithTutorial,
+                  dailyChallenge: dailyChallenge,
+                  snapshot: snapshot,
                 ),
-            Game.freeCell: (Difficulty difficulty, bool startWithTutorial) =>
+        Game.freeCell: (difficulty, startWithTutorial,
+                {DailyChallengeConfig? dailyChallenge,
+                ActiveGameSnapshot? snapshot}) =>
                 FreeCell(
                   difficulty: difficulty,
                   startWithTutorial: startWithTutorial,
+                  dailyChallenge: dailyChallenge,
+                  snapshot: snapshot,
                 ),
-            Game.pyramid: (Difficulty difficulty, bool startWithTutorial) =>
+        Game.pyramid: (difficulty, startWithTutorial,
+                {DailyChallengeConfig? dailyChallenge,
+                ActiveGameSnapshot? snapshot}) =>
                 PyramidSolitaire(
                   difficulty: difficulty,
                   startWithTutorial: startWithTutorial,
+                  dailyChallenge: dailyChallenge,
+                  snapshot: snapshot,
                 ),
-            Game.golf: (Difficulty difficulty, bool startWithTutorial) =>
+        Game.golf: (difficulty, startWithTutorial,
+                {DailyChallengeConfig? dailyChallenge,
+                ActiveGameSnapshot? snapshot}) =>
                 GolfSolitaire(
                   difficulty: difficulty,
                   startWithTutorial: startWithTutorial,
+                  dailyChallenge: dailyChallenge,
+                  snapshot: snapshot,
                 ),
-            Game.triPeaks: (Difficulty difficulty, bool startWithTutorial) =>
+        Game.triPeaks: (difficulty, startWithTutorial,
+                {DailyChallengeConfig? dailyChallenge,
+                ActiveGameSnapshot? snapshot}) =>
                 TriPeaksSolitaire(
                   difficulty: difficulty,
                   startWithTutorial: startWithTutorial,
+                  dailyChallenge: dailyChallenge,
+                  snapshot: snapshot,
                 ),
-          };
+      };
 
   void _startGame({
     required BuildContext context,
     required WidgetRef ref,
     required Game game,
-    required Widget Function(Difficulty, bool) builder,
+    required GameWidgetBuilder builder,
     required Difficulty difficulty,
+    DailyChallengeConfig? dailyChallenge,
+    ActiveGameSnapshot? snapshot,
   }) {
-    context
-        .pushReplacement(() => GameView(cardGame: builder(difficulty, false)));
+    context.pushReplacement(
+      () => GameView(
+        cardGame: builder(
+          difficulty,
+          false,
+          dailyChallenge: dailyChallenge,
+          snapshot: snapshot,
+        ),
+      ),
+    );
     ref.read(saveStateNotifierProvider.notifier).saveGameStarted(
           game: game,
           difficulty: difficulty,
         );
   }
 
+  void _startDailyGame({
+    required BuildContext context,
+    required WidgetRef ref,
+    required Game game,
+    required GameWidgetBuilder builder,
+    required DailyChallengeConfig config,
+  }) {
+    _startGame(
+      context: context,
+      ref: ref,
+      game: game,
+      builder: builder,
+      difficulty: config.difficulty,
+      dailyChallenge: config,
+      snapshot: null,
+    );
+  }
+
   void _showDifficultySelector({
     required BuildContext rootContext,
     required WidgetRef ref,
     required Game game,
-    required Widget Function(Difficulty, bool) builder,
+    required GameWidgetBuilder builder,
     required Difficulty currentDefault,
+    required DailyChallengeConfig dailyConfig,
+    required bool dailyCompleted,
   }) {
     showModalBottomSheet(
       context: rootContext,
@@ -86,6 +149,18 @@ class HomePage extends ConsumerWidget {
         return _DifficultySheet(
           game: game,
           defaultDifficulty: currentDefault,
+          dailyConfig: dailyConfig,
+          dailyCompleted: dailyCompleted,
+          onDailySelected: () {
+            Navigator.of(sheetContext).pop();
+            _startDailyGame(
+              context: rootContext,
+              ref: ref,
+              game: game,
+              builder: builder,
+              config: dailyConfig,
+            );
+          },
           onDifficultyChosen: (difficulty) {
             Navigator.of(sheetContext).pop();
             _startGame(
@@ -107,6 +182,7 @@ class HomePage extends ConsumerWidget {
     if (saveState == null) {
       return SizedBox.shrink();
     }
+    final dailyService = ref.watch(dailyChallengeServiceProvider);
 
     return Scaffold(
       backgroundColor: Color(0xFF0D2C54),
@@ -180,19 +256,24 @@ class HomePage extends ConsumerWidget {
               final builder = gameBuilders[game]!;
               final difficulty = saveState.lastPlayedGameDifficulties[game] ??
                   Difficulty.classic;
+              final dailyConfig = dailyService.configFor(game);
+              final dailyCompleted = dailyService.isCompleted(
+                game,
+                dailyConfig,
+                saveState.dailyChallengeProgress,
+              );
+              final snapshot = saveState.activeGames[game];
 
               return _GameCard(
                 game: game,
                 gradient: game.accentGradient,
                 icon: game.icon,
                 logoAsset: game.logoAsset,
-                onSelectDifficulty: () => _showDifficultySelector(
-                  rootContext: context,
-                  ref: ref,
-                  game: game,
-                  builder: builder,
-                  currentDefault: difficulty,
-                ),
+                dailyConfig: dailyConfig,
+                dailyCompleted: dailyCompleted,
+                onSelectDifficulty: () =>
+                    _handleGameSelection(context, ref, game, builder, difficulty,
+                        dailyConfig, dailyCompleted, snapshot),
               );
             },
           );
@@ -200,7 +281,82 @@ class HomePage extends ConsumerWidget {
       ),
     );
   }
+
+  Future<void> _handleGameSelection(
+    BuildContext context,
+    WidgetRef ref,
+    Game game,
+    GameWidgetBuilder builder,
+    Difficulty defaultDifficulty,
+    DailyChallengeConfig dailyConfig,
+    bool dailyCompleted,
+    ActiveGameSnapshot? snapshot,
+  ) async {
+    if (snapshot != null && !snapshot.isDaily) {
+      final decision = await _showResumeDialog(context, snapshot);
+      if (decision == _ResumeChoice.resume) {
+        if (!context.mounted) return;
+        _startGame(
+          context: context,
+          ref: ref,
+          game: game,
+          builder: builder,
+          difficulty: snapshot.difficulty,
+          snapshot: snapshot,
+        );
+        return;
+      } else if (decision == null) {
+        return;
+      } else {
+        if (!context.mounted) return;
+        await ref
+            .read(saveStateNotifierProvider.notifier)
+            .clearActiveGame(game);
+      }
+    }
+
+    if (!context.mounted) return;
+    _showDifficultySelector(
+      rootContext: context,
+      ref: ref,
+      game: game,
+      builder: builder,
+      currentDefault: defaultDifficulty,
+      dailyConfig: dailyConfig,
+      dailyCompleted: dailyCompleted,
+    );
+  }
+
+  Future<_ResumeChoice?> _showResumeDialog(
+      BuildContext context, ActiveGameSnapshot snapshot) {
+    return showDialog<_ResumeChoice>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Resume ${snapshot.difficulty.title} game?'),
+        content: Text(
+            'You have an unfinished game saved. Would you like to continue where you left off or start a new game?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(null),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(_ResumeChoice.newGame),
+            child: const Text('New Game'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(_ResumeChoice.resume),
+            child: const Text('Resume'),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
+enum _ResumeChoice { resume, newGame }
 
 class _GameCard extends StatelessWidget {
   final Game game;
@@ -208,6 +364,8 @@ class _GameCard extends StatelessWidget {
   final IconData icon;
   final String logoAsset;
   final VoidCallback onSelectDifficulty;
+  final DailyChallengeConfig dailyConfig;
+  final bool dailyCompleted;
 
   const _GameCard({
     required this.game,
@@ -215,6 +373,8 @@ class _GameCard extends StatelessWidget {
     required this.icon,
     required this.logoAsset,
     required this.onSelectDifficulty,
+    required this.dailyConfig,
+    required this.dailyCompleted,
   });
 
   @override
@@ -244,6 +404,34 @@ class _GameCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             child: Stack(
               children: [
+                // Positioned(
+                //   top: 12,
+                //   right: 12,
+                //   child: Container(
+                //     padding:
+                //         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                //     decoration: BoxDecoration(
+                //       color: dailyCompleted
+                //           ? Colors.greenAccent.withValues(alpha: 0.8)
+                //           : Colors.orangeAccent.withValues(alpha: 0.9),
+                //       borderRadius: BorderRadius.circular(999),
+                //       boxShadow: [
+                //         BoxShadow(
+                //           color: Colors.black.withValues(alpha: 0.2),
+                //           blurRadius: 6,
+                //         ),
+                //       ],
+                //     ),
+                //     child: Text(
+                //       dailyCompleted ? 'Daily Done' : 'Daily Ready',
+                //       style: const TextStyle(
+                //         color: Colors.black,
+                //         fontWeight: FontWeight.bold,
+                //         fontSize: 12,
+                //       ),
+                //     ),
+                //   ),
+                // ),
                 // Decorative pattern overlay
                 Positioned.fill(
                   child: Opacity(
@@ -317,10 +505,16 @@ class _DifficultySheet extends StatelessWidget {
   final Game game;
   final Difficulty defaultDifficulty;
   final ValueChanged<Difficulty> onDifficultyChosen;
+  final DailyChallengeConfig dailyConfig;
+  final bool dailyCompleted;
+  final VoidCallback onDailySelected;
 
   const _DifficultySheet({
     required this.game,
     required this.defaultDifficulty,
+    required this.dailyConfig,
+    required this.dailyCompleted,
+    required this.onDailySelected,
     required this.onDifficultyChosen,
   });
 
@@ -328,7 +522,6 @@ class _DifficultySheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return ThemedSheet(
       title: game.title,
-      // subtitle: 'Tap a difficulty to start playing.',
       child: Column(
         children: Difficulty.values
             .map(
@@ -340,7 +533,29 @@ class _DifficultySheet extends StatelessWidget {
                 highlight: defaultDifficulty == difficulty,
               ),
             )
-            .toList(),
+            .toList()
+          ..insert(
+            0,
+            SheetOptionTile(
+              icon: Symbols.calendar_month,
+              title: 'Daily Puzzle',
+              description: dailyCompleted
+                  ? 'You finished today\'s puzzle!'
+                  : 'Play today\'s puzzle and compete on the leaderboard.',
+              onTap: onDailySelected,
+              highlight: !dailyCompleted,
+              highlightColor: Colors.lightBlueAccent,
+              trailing: dailyCompleted
+                  ? const Icon(
+                      Icons.check_circle,
+                      color: Colors.lightGreenAccent,
+                    )
+                  : const Icon(
+                      Icons.leaderboard,
+                      color: Colors.white,
+                    ),
+            ),
+          ),
       ),
     );
   }

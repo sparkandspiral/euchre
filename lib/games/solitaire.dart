@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:card_game/card_game.dart';
@@ -6,17 +7,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:solitaire/group/exposed_deck.dart';
+import 'package:solitaire/model/active_game_snapshot.dart';
+import 'package:solitaire/model/daily_challenge.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/immutable_history.dart';
 import 'package:solitaire/model/hint.dart';
 import 'package:solitaire/services/achievement_service.dart';
 import 'package:solitaire/services/audio_service.dart';
+import 'package:solitaire/providers/save_state_notifier.dart';
 import 'package:solitaire/styles/playing_card_asset_bundle_cache.dart';
 import 'package:solitaire/styles/playing_card_style.dart';
 import 'package:solitaire/utils/axis_extensions.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
 import 'package:solitaire/utils/card_description.dart';
+import 'package:solitaire/utils/suited_card_codec.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/delayed_auto_move_listener.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
@@ -50,9 +55,13 @@ class SolitaireState {
     required this.history,
   });
 
-  static SolitaireState getInitialState(
-      {required int drawAmount, required bool acesAtBottom}) {
-    var deck = SuitedCard.deck.shuffled();
+  static SolitaireState getInitialState({
+    required int drawAmount,
+    required bool acesAtBottom,
+    int? shuffleSeed,
+  }) {
+    final random = shuffleSeed == null ? Random() : Random(shuffleSeed);
+    var deck = List.of(SuitedCard.deck)..shuffle(random);
 
     final aces =
         deck.where((card) => card.value == AceSuitedCardValue()).toList();
@@ -93,6 +102,62 @@ class SolitaireState {
       restartedDeck: false,
       canAutoMove: true,
       drawAmount: drawAmount,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'drawAmount': drawAmount,
+        'hiddenCards': hiddenCards
+            .map((column) => column.map(encodeSuitedCard).toList())
+            .toList(),
+        'revealedCards': revealedCards
+            .map((column) => column.map(encodeSuitedCard).toList())
+            .toList(),
+        'deck': deck.map(encodeSuitedCard).toList(),
+        'revealedDeck': revealedDeck.map(encodeSuitedCard).toList(),
+        'completedCards': completedCards.map(
+          (suit, cards) => MapEntry(
+            suit.index.toString(),
+            cards.map(encodeSuitedCard).toList(),
+          ),
+        ),
+        'usedUndo': usedUndo,
+        'restartedDeck': restartedDeck,
+        'canAutoMove': canAutoMove,
+      };
+
+  factory SolitaireState.fromJson(Map<String, dynamic> json) {
+    List<List<SuitedCard>> decodeMatrix(List<dynamic> data) => data
+        .map<List<SuitedCard>>((column) => (column as List)
+            .map((card) => decodeSuitedCard(
+                Map<String, dynamic>.from(card as Map<dynamic, dynamic>)))
+            .toList())
+        .toList();
+    List<SuitedCard> decodeList(List<dynamic> data) => data
+        .map((card) => decodeSuitedCard(
+            Map<String, dynamic>.from(card as Map<dynamic, dynamic>)))
+        .toList();
+    final completedJson =
+        (json['completedCards'] as Map?)?.cast<String, dynamic>() ?? {};
+    final completed = <CardSuit, List<SuitedCard>>{};
+    completedJson.forEach((key, value) {
+      final suit = CardSuit.values[int.parse(key)];
+      completed[suit] = (value as List)
+          .map((card) => decodeSuitedCard(
+              Map<String, dynamic>.from(card as Map<dynamic, dynamic>)))
+          .toList();
+    });
+    return SolitaireState(
+      drawAmount: json['drawAmount'] as int? ?? 1,
+      hiddenCards: decodeMatrix(json['hiddenCards'] as List<dynamic>),
+      revealedCards: decodeMatrix(json['revealedCards'] as List<dynamic>),
+      deck: decodeList(json['deck'] as List<dynamic>),
+      revealedDeck: decodeList(json['revealedDeck'] as List<dynamic>),
+      completedCards: completed,
+      usedUndo: json['usedUndo'] as bool? ?? false,
+      restartedDeck: json['restartedDeck'] as bool? ?? false,
+      canAutoMove: json['canAutoMove'] as bool? ?? true,
+      history: const ImmutableHistory.empty(),
     );
   }
 
@@ -482,23 +547,71 @@ class SolitaireState {
 class Solitaire extends HookConsumerWidget {
   final Difficulty difficulty;
   final bool startWithTutorial;
+  final DailyChallengeConfig? dailyChallenge;
+  final ActiveGameSnapshot? snapshot;
 
   const Solitaire(
-      {super.key, required this.difficulty, this.startWithTutorial = false});
+      {super.key,
+      required this.difficulty,
+      this.startWithTutorial = false,
+      this.dailyChallenge,
+      this.snapshot});
 
   int get drawAmount => switch (difficulty) {
         Difficulty.classic => 1,
         Difficulty.royal || Difficulty.ace => 3,
       };
 
-  SolitaireState get initialState => SolitaireState.getInitialState(
+  SolitaireState get defaultInitialState => SolitaireState.getInitialState(
         drawAmount: drawAmount,
         acesAtBottom: difficulty == Difficulty.ace,
+        shuffleSeed: dailyChallenge?.shuffleSeed,
       );
+
+  SolitaireState get initialState {
+    if (dailyChallenge != null) {
+      return defaultInitialState;
+    }
+    if (snapshot != null) {
+      try {
+        return SolitaireState.fromJson(snapshot!.state);
+      } catch (_) {
+        return defaultInitialState;
+      }
+    }
+    return defaultInitialState;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = useState(initialState);
+    final startReference = useState<DateTime>(
+      DateTime.now().subtract(
+        Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      ),
+    );
+    final saveStateNotifier = ref.read(saveStateNotifierProvider.notifier);
+
+    Future<void> persistSnapshot() async {
+      if (dailyChallenge != null || state.value.isVictory) {
+        return;
+      }
+      final activeSnapshot = ActiveGameSnapshot(
+        game: Game.klondike,
+        difficulty: difficulty,
+        isDaily: false,
+        shuffleSeed: null,
+        state: state.value.toJson(),
+        updatedAt: DateTime.now(),
+        elapsedMilliseconds:
+            DateTime.now().difference(startReference.value).inMilliseconds,
+      );
+      await saveStateNotifier.saveActiveGameSnapshot(activeSnapshot);
+    }
+
+    Future<void> clearSnapshot() {
+      return saveStateNotifier.clearActiveGame(Game.klondike);
+    }
 
     final tableauKey = useMemoized(() => GlobalKey());
     final foundationKey = useMemoized(() => GlobalKey());
@@ -544,23 +657,50 @@ class Solitaire extends HookConsumerWidget {
       return null;
     });
 
+    useOnListenableChange(
+      state,
+      () {
+        if (!state.value.isVictory) {
+          persistSnapshot();
+        }
+      },
+    );
+
+    final initialElapsed =
+        Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0);
+
     return CardScaffold(
       game: Game.klondike,
       difficulty: difficulty,
-      onNewGame: () => state.value = initialState,
-      onRestart: () => state.value =
-          (state.value.history.firstOrNull ?? state.value)
-              .copyWith(usedUndo: false),
+      dailyChallenge: dailyChallenge,
+      initialElapsed: initialElapsed,
+      onNewGame: () {
+        if (dailyChallenge == null) {
+          unawaited(clearSnapshot());
+        }
+        startReference.value = DateTime.now();
+        state.value = defaultInitialState;
+      },
+      onRestart: () {
+        startReference.value = DateTime.now();
+        state.value = (state.value.history.firstOrNull ?? state.value)
+            .copyWith(usedUndo: false);
+      },
       onTutorial: startTutorial,
       onUndo: state.value.history.isEmpty
           ? null
           : () => state.value = state.value.withUndo(),
       onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
-      onVictory: () => ref
-          .read(achievementServiceProvider)
-          .checkSolitaireCompletionAchievements(
-              state: state.value, difficulty: difficulty),
+      onVictory: (_, __) async {
+        await ref
+            .read(achievementServiceProvider)
+            .checkSolitaireCompletionAchievements(
+                state: state.value, difficulty: difficulty);
+        if (dailyChallenge == null) {
+          await clearSnapshot();
+        }
+      },
       builder: (context, constraints, cardBack, autoMoveEnabled, gameKey) {
         final axis = constraints.largestAxis;
         final minSize = constraints.smallest.longestSide;

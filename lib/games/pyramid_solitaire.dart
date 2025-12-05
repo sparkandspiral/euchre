@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:card_game/card_game.dart';
@@ -6,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:equatable/equatable.dart';
+import 'package:solitaire/model/active_game_snapshot.dart';
+import 'package:solitaire/model/daily_challenge.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/immutable_history.dart';
@@ -15,9 +18,11 @@ import 'package:solitaire/services/audio_service.dart';
 import 'package:solitaire/styles/playing_card_builder.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
 import 'package:solitaire/utils/card_description.dart';
+import 'package:solitaire/utils/suited_card_codec.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
 import 'package:utils/utils.dart';
+import 'package:solitaire/providers/save_state_notifier.dart';
 
 class PyramidCardPos {
   final int row;
@@ -34,6 +39,17 @@ class PyramidCard extends Equatable {
   @override
   List<Object?> get props => [card, uniqueId];
 }
+
+Map<String, dynamic> encodePyramidCard(PyramidCard card) => {
+      'card': encodeSuitedCard(card.card),
+      'id': card.uniqueId,
+    };
+
+PyramidCard decodePyramidCard(Map<String, dynamic> json) => PyramidCard(
+      decodeSuitedCard(
+          Map<String, dynamic>.from(json['card'] as Map<dynamic, dynamic>)),
+      json['id'] as int,
+    );
 
 class PyramidSolitaireState {
   // 7 rows; row i has i+1 cards. Null entries represent removed cards.
@@ -59,8 +75,10 @@ class PyramidSolitaireState {
     required int drawPerTap,
     required bool buryAces,
     required bool startWithWasteCard,
+    int? shuffleSeed,
   }) {
-    var suitedDeck = SuitedCard.deck.shuffled();
+    final random = shuffleSeed == null ? Random() : Random(shuffleSeed);
+    var suitedDeck = List.of(SuitedCard.deck)..shuffle(random);
 
     // Optionally bury Aces at bottom of stock to increase difficulty similar to Ace mode patterns
     if (buryAces) {
@@ -102,6 +120,55 @@ class PyramidSolitaireState {
       history: const ImmutableHistory.empty(),
       usedUndo: false,
       selected: null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'pyramid': pyramid
+            .map((row) => row
+                .map((card) => card == null ? null : encodePyramidCard(card))
+                .toList())
+            .toList(),
+        'stock': stock.map(encodePyramidCard).toList(),
+        'waste': waste.map(encodePyramidCard).toList(),
+        'usedUndo': usedUndo,
+        'selected': selected == null
+            ? null
+            : {
+                'row': selected!.row,
+                'col': selected!.col,
+              },
+      };
+
+  factory PyramidSolitaireState.fromJson(Map<String, dynamic> json) {
+    List<List<PyramidCard?>> decodePyramid(List<dynamic> data) => data
+        .map<List<PyramidCard?>>((row) => (row as List)
+            .map<PyramidCard?>((card) => card == null
+                ? null
+                : decodePyramidCard(
+                    Map<String, dynamic>.from(card as Map<dynamic, dynamic>)))
+            .toList())
+        .toList();
+    List<PyramidCard> decodeList(List<dynamic> data) => data
+        .map((card) => decodePyramidCard(
+            Map<String, dynamic>.from(card as Map<dynamic, dynamic>)))
+        .toList();
+
+    final selectedJson =
+        json['selected'] == null ? null : json['selected'] as Map;
+
+    return PyramidSolitaireState(
+      pyramid: decodePyramid(json['pyramid'] as List<dynamic>),
+      stock: decodeList(json['stock'] as List<dynamic>),
+      waste: decodeList(json['waste'] as List<dynamic>),
+      history: const ImmutableHistory.empty(),
+      usedUndo: json['usedUndo'] as bool? ?? false,
+      selected: selectedJson == null
+          ? null
+          : PyramidCardPos(
+              selectedJson['row'] as int,
+              selectedJson['col'] as int,
+            ),
     );
   }
 
@@ -285,18 +352,38 @@ class PyramidSolitaireState {
 class PyramidSolitaire extends HookConsumerWidget {
   final Difficulty difficulty;
   final bool startWithTutorial;
+  final DailyChallengeConfig? dailyChallenge;
+  final ActiveGameSnapshot? snapshot;
 
-  const PyramidSolitaire(
-      {super.key, required this.difficulty, this.startWithTutorial = false});
+  const PyramidSolitaire({
+    super.key,
+    required this.difficulty,
+    this.startWithTutorial = false,
+    this.dailyChallenge,
+    this.snapshot,
+  });
 
   int get drawPerTap => 1; // standard pyramid draws 1 to waste
 
-  PyramidSolitaireState get initialState =>
+  PyramidSolitaireState get defaultInitialState =>
       PyramidSolitaireState.getInitialState(
         drawPerTap: drawPerTap,
         buryAces: difficulty == Difficulty.ace,
         startWithWasteCard: difficulty.index >= Difficulty.royal.index,
+        shuffleSeed: dailyChallenge?.shuffleSeed,
       );
+
+  PyramidSolitaireState get initialState {
+    if (dailyChallenge != null) return defaultInitialState;
+    if (snapshot != null) {
+      try {
+        return PyramidSolitaireState.fromJson(snapshot!.state);
+      } catch (_) {
+        return defaultInitialState;
+      }
+    }
+    return defaultInitialState;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -353,22 +440,74 @@ class PyramidSolitaire extends HookConsumerWidget {
       return null;
     });
 
+    final startReference = useState<DateTime>(
+      DateTime.now().subtract(
+        Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      ),
+    );
+    final saveStateNotifier = ref.read(saveStateNotifierProvider.notifier);
+
+    Future<void> persistSnapshot() async {
+      if (dailyChallenge != null || state.value.isVictory) return;
+      final activeSnapshot = ActiveGameSnapshot(
+        game: Game.pyramid,
+        difficulty: difficulty,
+        isDaily: false,
+        shuffleSeed: null,
+        state: state.value.toJson(),
+        updatedAt: DateTime.now(),
+        elapsedMilliseconds:
+            DateTime.now().difference(startReference.value).inMilliseconds,
+      );
+      await saveStateNotifier.saveActiveGameSnapshot(activeSnapshot);
+    }
+
+    Future<void> clearSnapshot() =>
+        saveStateNotifier.clearActiveGame(Game.pyramid);
+
+    useOnListenableChange(
+      state,
+      () {
+        if (!state.value.isVictory) {
+          persistSnapshot();
+        }
+      },
+    );
+
     return CardScaffold(
       game: Game.pyramid,
       difficulty: difficulty,
-      onNewGame: () => state.value = initialState,
-      onRestart: () => state.value =
-          (state.value.history.firstOrNull ?? state.value)
-              .copyWith(usedUndo: false),
+      dailyChallenge: dailyChallenge,
+      initialElapsed:
+          Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      onNewGame: () {
+        if (dailyChallenge == null) {
+          unawaited(clearSnapshot());
+        }
+        startReference.value = DateTime.now();
+        state.value = defaultInitialState;
+      },
+      onRestart: () {
+        startReference.value = DateTime.now();
+        state.value =
+            (state.value.history.firstOrNull ?? state.value)
+                .copyWith(usedUndo: false);
+      },
       onTutorial: startTutorial,
       onUndo: state.value.history.isEmpty
           ? null
           : () => state.value = state.value.withUndo(),
       onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
-      onVictory: () => ref
-          .read(achievementServiceProvider)
-          .checkPyramidSolitaireCompletionAchievements(state: state.value),
+      onVictory: (_, __) async {
+        await ref
+            .read(achievementServiceProvider)
+            .checkPyramidSolitaireCompletionAchievements(
+                state: state.value);
+        if (dailyChallenge == null) {
+          await clearSnapshot();
+        }
+      },
       builder: (context, constraints, cardBack, autoMoveEnabled, gameKey) {
         final axis = constraints.largestAxis;
         final minSize = constraints.smallest.longestSide;
@@ -534,8 +673,8 @@ class PyramidSolitaire extends HookConsumerWidget {
             height: tableauHeight,
             child: Stack(
               clipBehavior: Clip.none,
-              children: positionedCards,
               fit: StackFit.passthrough,
+              children: positionedCards,
             ),
           );
         }
@@ -602,9 +741,9 @@ class PyramidSolitaire extends HookConsumerWidget {
               vertical: spacing * 1.2,
             ),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.18),
+              color: Colors.black.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.white.withOpacity(0.12)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -631,7 +770,7 @@ class PyramidSolitaire extends HookConsumerWidget {
                             vertical: spacing * 0.6,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
+                            color: Colors.white.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -699,13 +838,13 @@ class PyramidSolitaire extends HookConsumerWidget {
               final shadows = <BoxShadow>[
                 if (isSelected)
                   BoxShadow(
-                    color: accentColor.withOpacity(0.45),
+                    color: accentColor.withValues(alpha: 0.45),
                     blurRadius: 18,
                     spreadRadius: 1.2,
                   ),
                 if (showDepthShadow)
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.35),
+                    color: Colors.black.withValues(alpha: 0.35),
                     blurRadius: 10,
                     offset: Offset(0, 6),
                   ),

@@ -1,3 +1,7 @@
+import 'dart:math';
+
+import 'dart:async';
+
 import 'package:card_game/card_game.dart';
 import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
@@ -5,6 +9,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:solitaire/model/active_game_snapshot.dart';
+import 'package:solitaire/model/daily_challenge.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/immutable_history.dart';
@@ -15,7 +21,9 @@ import 'package:solitaire/services/audio_service.dart';
 import 'package:solitaire/styles/playing_card_builder.dart';
 import 'package:solitaire/utils/axis_extensions.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
+import 'package:solitaire/providers/save_state_notifier.dart';
 import 'package:solitaire/utils/card_description.dart';
+import 'package:solitaire/utils/suited_card_codec.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
 import 'package:utils/utils.dart';
@@ -33,6 +41,17 @@ class SpiderCard extends Equatable {
   @override
   List<Object?> get props => [card, uniqueId];
 }
+
+Map<String, dynamic> encodeSpiderCard(SpiderCard card) => {
+      'card': encodeSuitedCard(card.card),
+      'id': card.uniqueId,
+    };
+
+SpiderCard decodeSpiderCard(Map<String, dynamic> json) => SpiderCard(
+      decodeSuitedCard(
+          Map<String, dynamic>.from(json['card'] as Map<dynamic, dynamic>)),
+      json['id'] as int,
+    );
 
 class SpiderSolitaireState {
   final List<List<SpiderCard>> hiddenCards;
@@ -54,7 +73,10 @@ class SpiderSolitaireState {
     required this.history,
   });
 
-  static SpiderSolitaireState getInitialState({required int suitCount}) {
+  static SpiderSolitaireState getInitialState({
+    required int suitCount,
+    int? shuffleSeed,
+  }) {
     // Spider Solitaire always uses 104 cards (8 complete suits)
     // 1 suit: 8 sets of same suit
     // 2 suits: 4 sets of each suit
@@ -91,7 +113,8 @@ class SpiderSolitaireState {
       }
     }
 
-    deck = deck.shuffled();
+    final random = shuffleSeed == null ? Random() : Random(shuffleSeed);
+    deck.shuffle(random);
 
     // Deal initial tableau: first 4 columns get 6 cards, last 6 get 5 cards
     final hiddenCards = <List<SpiderCard>>[];
@@ -116,6 +139,41 @@ class SpiderSolitaireState {
       completedSequences: 0,
       suitCount: suitCount,
       usedUndo: false,
+      history: const ImmutableHistory.empty(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'hiddenCards': hiddenCards
+            .map((column) => column.map(encodeSpiderCard).toList())
+            .toList(),
+        'revealedCards': revealedCards
+            .map((column) => column.map(encodeSpiderCard).toList())
+            .toList(),
+        'stock': stock.map(encodeSpiderCard).toList(),
+        'completedSequences': completedSequences,
+        'suitCount': suitCount,
+        'usedUndo': usedUndo,
+      };
+
+  factory SpiderSolitaireState.fromJson(Map<String, dynamic> json) {
+    List<List<SpiderCard>> decodeMatrix(List<dynamic> data) => data
+        .map<List<SpiderCard>>((column) => (column as List)
+            .map((card) => decodeSpiderCard(
+                Map<String, dynamic>.from(card as Map<dynamic, dynamic>)))
+            .toList())
+        .toList();
+    List<SpiderCard> decodeList(List<dynamic> data) => data
+        .map((card) => decodeSpiderCard(
+            Map<String, dynamic>.from(card as Map<dynamic, dynamic>)))
+        .toList();
+    return SpiderSolitaireState(
+      hiddenCards: decodeMatrix(json['hiddenCards'] as List<dynamic>),
+      revealedCards: decodeMatrix(json['revealedCards'] as List<dynamic>),
+      stock: decodeList(json['stock'] as List<dynamic>),
+      completedSequences: json['completedSequences'] as int? ?? 0,
+      suitCount: json['suitCount'] as int? ?? 1,
+      usedUndo: json['usedUndo'] as bool? ?? false,
       history: const ImmutableHistory.empty(),
     );
   }
@@ -399,9 +457,15 @@ class SpiderSolitaireState {
 class SpiderSolitaire extends HookConsumerWidget {
   final Difficulty difficulty;
   final bool startWithTutorial;
+  final DailyChallengeConfig? dailyChallenge;
+  final ActiveGameSnapshot? snapshot;
 
   const SpiderSolitaire(
-      {super.key, required this.difficulty, this.startWithTutorial = false});
+      {super.key,
+      required this.difficulty,
+      this.startWithTutorial = false,
+      this.dailyChallenge,
+      this.snapshot});
 
   int get suitCount => switch (difficulty) {
         Difficulty.classic => 1,
@@ -409,13 +473,51 @@ class SpiderSolitaire extends HookConsumerWidget {
         Difficulty.ace => 4,
       };
 
-  SpiderSolitaireState get initialState => SpiderSolitaireState.getInitialState(
+  SpiderSolitaireState get defaultInitialState =>
+      SpiderSolitaireState.getInitialState(
         suitCount: suitCount,
+        shuffleSeed: dailyChallenge?.shuffleSeed,
       );
+
+  SpiderSolitaireState get initialState {
+    if (dailyChallenge != null) return defaultInitialState;
+    if (snapshot != null) {
+      try {
+        return SpiderSolitaireState.fromJson(snapshot!.state);
+      } catch (_) {
+        return defaultInitialState;
+      }
+    }
+    return defaultInitialState;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = useState(initialState);
+    final startReference = useState<DateTime>(
+      DateTime.now().subtract(
+        Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      ),
+    );
+    final saveStateNotifier = ref.read(saveStateNotifierProvider.notifier);
+
+    Future<void> persistSnapshot() async {
+      if (dailyChallenge != null || state.value.isVictory) return;
+      final activeSnapshot = ActiveGameSnapshot(
+        game: Game.spider,
+        difficulty: difficulty,
+        isDaily: false,
+        shuffleSeed: null,
+        state: state.value.toJson(),
+        updatedAt: DateTime.now(),
+        elapsedMilliseconds:
+            DateTime.now().difference(startReference.value).inMilliseconds,
+      );
+      await saveStateNotifier.saveActiveGameSnapshot(activeSnapshot);
+    }
+
+    Future<void> clearSnapshot() =>
+        saveStateNotifier.clearActiveGame(Game.spider);
 
     useOnListenableChange(
       state,
@@ -463,23 +565,49 @@ class SpiderSolitaire extends HookConsumerWidget {
       return null;
     });
 
+    useOnListenableChange(
+      state,
+      () {
+        if (!state.value.isVictory) {
+          persistSnapshot();
+        }
+      },
+    );
+
     return CardScaffold(
       game: Game.spider,
       difficulty: difficulty,
-      onNewGame: () => state.value = initialState,
-      onRestart: () => state.value =
+      dailyChallenge: dailyChallenge,
+      initialElapsed:
+          Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      onNewGame: () {
+        if (dailyChallenge == null) {
+          unawaited(clearSnapshot());
+        }
+        startReference.value = DateTime.now();
+        state.value = defaultInitialState;
+      },
+      onRestart: () {
+        startReference.value = DateTime.now();
+        state.value =
           (state.value.history.firstOrNull ?? state.value)
-              .copyWith(usedUndo: false),
+                .copyWith(usedUndo: false);
+      },
       onTutorial: startTutorial,
       onUndo: state.value.history.isEmpty
           ? null
           : () => state.value = state.value.withUndo(),
       onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
-      onVictory: () => ref
+      onVictory: (_, __) async {
+        await ref
           .read(achievementServiceProvider)
           .checkSpiderSolitaireCompletionAchievements(
-              difficulty: difficulty, state: state.value),
+                difficulty: difficulty, state: state.value);
+        if (dailyChallenge == null) {
+          await clearSnapshot();
+        }
+      },
       builder: (context, constraints, cardBack, autoMoveEnabled, gameKey) {
         final axis = constraints.largestAxis;
         final minSize = constraints.smallest.longestSide;
@@ -635,8 +763,9 @@ class SpiderSolitaire extends HookConsumerWidget {
                         canCardBeGrabbed: (_, card) {
                           // Check if card is in revealed cards
                           final cardIndex = allSpiderCards.indexOf(card);
-                          if (cardIndex < hiddenSpiderCards.length)
+                          if (cardIndex < hiddenSpiderCards.length) {
                             return false;
+                          }
 
                           // Get spider cards subsequence
                           final revealedIndex =

@@ -31,7 +31,20 @@ SaveState _$SaveStateFromJson(Map<String, dynamic> json) => SaveState(
           CardBack.redStripes,
       volume: (json['volume'] as num?)?.toDouble() ?? 1.0,
       enableAutoMove: json['enableAutoMove'] as bool? ?? true,
-      hints: (json['hints'] as num?)?.toInt() ?? defaultHintCount,
+      hints: (json['hints'] as num?)?.toInt() ?? 10,
+      dailyChallengeProgress:
+          (json['dailyChallengeProgress'] as Map<String, dynamic>?)?.map(
+                (k, e) => MapEntry($enumDecode(_$GameEnumMap, k),
+                    DailyChallengeProgress.fromJson(e as Map<String, dynamic>)),
+              ) ??
+              {},
+      activeGames: (json['activeGames'] as Map<String, dynamic>?)?.map(
+            (k, e) => MapEntry($enumDecode(_$GameEnumMap, k),
+                ActiveGameSnapshot.fromJson(e as Map<String, dynamic>)),
+          ) ??
+          {},
+      adsRemoved: json['adsRemoved'] as bool? ?? false,
+      unlimitedHints: json['unlimitedHints'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$SaveStateToJson(SaveState instance) => <String, dynamic>{
@@ -48,6 +61,12 @@ Map<String, dynamic> _$SaveStateToJson(SaveState instance) => <String, dynamic>{
       'volume': instance.volume,
       'enableAutoMove': instance.enableAutoMove,
       'hints': instance.hints,
+      'dailyChallengeProgress': instance.dailyChallengeProgress
+          .map((k, e) => MapEntry(_$GameEnumMap[k]!, e)),
+      'activeGames':
+          instance.activeGames.map((k, e) => MapEntry(_$GameEnumMap[k]!, e)),
+      'adsRemoved': instance.adsRemoved,
+      'unlimitedHints': instance.unlimitedHints,
     };
 
 const _$GameEnumMap = {
@@ -73,6 +92,10 @@ const _$AchievementEnumMap = {
   Achievement.perfectPlanning: 'perfectPlanning',
   Achievement.peakPerformance: 'peakPerformance',
   Achievement.summitMaster: 'summitMaster',
+  Achievement.silkRoad: 'silkRoad',
+  Achievement.eightfoldMaster: 'eightfoldMaster',
+  Achievement.desertRunner: 'desertRunner',
+  Achievement.sunDial: 'sunDial',
 };
 
 const _$DifficultyEnumMap = {

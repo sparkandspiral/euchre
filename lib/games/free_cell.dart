@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:card_game/card_game.dart';
@@ -6,6 +7,8 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:solitaire/model/active_game_snapshot.dart';
+import 'package:solitaire/model/daily_challenge.dart';
 import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/model/immutable_history.dart';
@@ -17,6 +20,8 @@ import 'package:solitaire/styles/playing_card_style.dart';
 import 'package:solitaire/utils/axis_extensions.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
 import 'package:solitaire/utils/card_description.dart';
+import 'package:solitaire/utils/suited_card_codec.dart';
+import 'package:solitaire/providers/save_state_notifier.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/delayed_auto_move_listener.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
@@ -72,9 +77,13 @@ class FreeCellState {
     required this.history,
   });
 
-  static FreeCellState getInitialState(
-      {required int freeCellCount, required bool acesAtBottom}) {
-    var deck = SuitedCard.deck.shuffled();
+  static FreeCellState getInitialState({
+    required int freeCellCount,
+    required bool acesAtBottom,
+    int? shuffleSeed,
+  }) {
+    final random = shuffleSeed == null ? Random() : Random(shuffleSeed);
+    var deck = List.of(SuitedCard.deck)..shuffle(random);
 
     final aces =
         deck.where((card) => card.value == AceSuitedCardValue()).toList();
@@ -104,6 +113,55 @@ class FreeCellState {
       usedUndo: false,
       history: const ImmutableHistory.empty(),
       canAutoMove: true,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'tableau': tableauCards
+            .map((column) => column.map(encodeSuitedCard).toList())
+            .toList(),
+        'freeCells': freeCells
+            .map((card) => card == null ? null : encodeSuitedCard(card))
+            .toList(),
+        'foundations': foundationCards.map((suit, cards) => MapEntry(
+            suit.index.toString(), cards.map(encodeSuitedCard).toList())),
+        'usedUndo': usedUndo,
+        'canAutoMove': canAutoMove,
+      };
+
+  factory FreeCellState.fromJson(Map<String, dynamic> json) {
+    List<List<SuitedCard>> decodeTableau(List<dynamic> data) => data
+        .map<List<SuitedCard>>((column) => (column as List)
+            .map((card) => decodeSuitedCard(
+                Map<String, dynamic>.from(card as Map<dynamic, dynamic>)))
+            .toList())
+        .toList();
+
+    List<SuitedCard?> decodeFreeCells(List<dynamic> data) => data
+        .map<SuitedCard?>((value) => value == null
+            ? null
+            : decodeSuitedCard(
+                Map<String, dynamic>.from(value as Map<dynamic, dynamic>)))
+        .toList();
+
+    final foundationsJson =
+        (json['foundations'] as Map?)?.cast<String, dynamic>() ?? {};
+    final foundations = <CardSuit, List<SuitedCard>>{};
+    foundationsJson.forEach((key, value) {
+      final suit = CardSuit.values[int.parse(key)];
+      foundations[suit] = (value as List)
+          .map((card) => decodeSuitedCard(
+              Map<String, dynamic>.from(card as Map<dynamic, dynamic>)))
+          .toList();
+    });
+
+    return FreeCellState(
+      tableauCards: decodeTableau(json['tableau'] as List<dynamic>),
+      freeCells: decodeFreeCells(json['freeCells'] as List<dynamic>),
+      foundationCards: foundations,
+      usedUndo: json['usedUndo'] as bool? ?? false,
+      canAutoMove: json['canAutoMove'] as bool? ?? true,
+      history: const ImmutableHistory.empty(),
     );
   }
 
@@ -649,21 +707,64 @@ class FreeCellState {
 class FreeCell extends HookConsumerWidget {
   final Difficulty difficulty;
   final bool startWithTutorial;
+  final DailyChallengeConfig? dailyChallenge;
+  final ActiveGameSnapshot? snapshot;
 
   const FreeCell(
-      {super.key, required this.difficulty, this.startWithTutorial = false});
+      {super.key,
+      required this.difficulty,
+      this.startWithTutorial = false,
+      this.dailyChallenge,
+      this.snapshot});
 
-  FreeCellState get initialState => FreeCellState.getInitialState(
+  FreeCellState get defaultInitialState => FreeCellState.getInitialState(
         freeCellCount: switch (difficulty) {
           Difficulty.classic => 4,
           Difficulty.royal || Difficulty.ace => 3,
         },
         acesAtBottom: difficulty == Difficulty.ace,
+        shuffleSeed: dailyChallenge?.shuffleSeed,
       );
+
+  FreeCellState get initialState {
+    if (dailyChallenge != null) return defaultInitialState;
+    if (snapshot != null) {
+      try {
+        return FreeCellState.fromJson(snapshot!.state);
+      } catch (_) {
+        return defaultInitialState;
+      }
+    }
+    return defaultInitialState;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = useState(initialState);
+    final startReference = useState<DateTime>(
+      DateTime.now().subtract(
+        Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      ),
+    );
+    final saveStateNotifier = ref.read(saveStateNotifierProvider.notifier);
+
+    Future<void> persistSnapshot() async {
+      if (dailyChallenge != null || state.value.isVictory) return;
+      final activeSnapshot = ActiveGameSnapshot(
+        game: Game.freeCell,
+        difficulty: difficulty,
+        isDaily: false,
+        shuffleSeed: null,
+        state: state.value.toJson(),
+        updatedAt: DateTime.now(),
+        elapsedMilliseconds:
+            DateTime.now().difference(startReference.value).inMilliseconds,
+      );
+      await saveStateNotifier.saveActiveGameSnapshot(activeSnapshot);
+    }
+
+    Future<void> clearSnapshot() =>
+        saveStateNotifier.clearActiveGame(Game.freeCell);
 
     useOnListenableChange(
       state,
@@ -711,23 +812,49 @@ class FreeCell extends HookConsumerWidget {
       return null;
     });
 
+    useOnListenableChange(
+      state,
+      () {
+        if (!state.value.isVictory) {
+          persistSnapshot();
+        }
+      },
+    );
+
     return CardScaffold(
       game: Game.freeCell,
       difficulty: difficulty,
-      onNewGame: () => state.value = initialState,
-      onRestart: () => state.value =
-          (state.value.history.firstOrNull ?? state.value)
-              .copyWith(canAutoMove: true),
+      dailyChallenge: dailyChallenge,
+      initialElapsed:
+          Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      onNewGame: () {
+        if (dailyChallenge == null) {
+          unawaited(clearSnapshot());
+        }
+        startReference.value = DateTime.now();
+        state.value = defaultInitialState;
+      },
+      onRestart: () {
+        startReference.value = DateTime.now();
+        state.value =
+            (state.value.history.firstOrNull ?? state.value)
+                .copyWith(canAutoMove: true);
+      },
       onTutorial: startTutorial,
       onUndo: state.value.history.isEmpty
           ? null
           : () => state.value = state.value.withUndo(),
       onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
-      onVictory: () => ref
-          .read(achievementServiceProvider)
-          .checkFreeCellCompletionAchievements(
-              difficulty: difficulty, state: state.value),
+      onVictory: (_, __) async {
+        await ref
+            .read(achievementServiceProvider)
+            .checkFreeCellCompletionAchievements(
+                difficulty: difficulty, state: state.value);
+        if (dailyChallenge == null) {
+          await clearSnapshot();
+        }
+      },
       builder: (context, constraints, cardBack, autoMoveEnabled, gameKey) {
         final axis = constraints.largestAxis;
         final minSize = constraints.smallest.longestSide;

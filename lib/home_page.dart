@@ -404,34 +404,34 @@ class _GameCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             child: Stack(
               children: [
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: dailyCompleted
-                          ? Colors.greenAccent.withValues(alpha: 0.8)
-                          : Colors.orangeAccent.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(999),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 6,
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      dailyCompleted ? 'Daily Done' : 'Daily Ready',
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ),
+                // Positioned(
+                //   top: 12,
+                //   right: 12,
+                //   child: Container(
+                //     padding:
+                //         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                //     decoration: BoxDecoration(
+                //       color: dailyCompleted
+                //           ? Colors.greenAccent.withValues(alpha: 0.8)
+                //           : Colors.orangeAccent.withValues(alpha: 0.9),
+                //       borderRadius: BorderRadius.circular(999),
+                //       boxShadow: [
+                //         BoxShadow(
+                //           color: Colors.black.withValues(alpha: 0.2),
+                //           blurRadius: 6,
+                //         ),
+                //       ],
+                //     ),
+                //     child: Text(
+                //       dailyCompleted ? 'Daily Done' : 'Daily Ready',
+                //       style: const TextStyle(
+                //         color: Colors.black,
+                //         fontWeight: FontWeight.bold,
+                //         fontSize: 12,
+                //       ),
+                //     ),
+                //   ),
+                // ),
                 // Decorative pattern overlay
                 Positioned.fill(
                   child: Opacity(
@@ -540,8 +540,8 @@ class _DifficultySheet extends StatelessWidget {
               icon: Symbols.calendar_month,
               title: 'Daily Puzzle',
               description: dailyCompleted
-                  ? 'You finished today\'s ${dailyConfig.formattedLabel}.'
-                  : 'Play today\'s ${dailyConfig.formattedLabel} seed and compete on the leaderboard.',
+                  ? 'You finished today\'s puzzle!'
+                  : 'Play today\'s puzzle and compete on the leaderboard.',
               onTap: onDailySelected,
               highlight: !dailyCompleted,
               highlightColor: Colors.lightBlueAccent,

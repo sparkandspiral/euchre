@@ -81,7 +81,12 @@ class SpiderSolitaireState {
     // 1 suit: 8 sets of same suit
     // 2 suits: 4 sets of each suit
     // 4 suits: 2 sets of each suit
-    final suits = CardSuit.values.take(suitCount).toList();
+    final suits = switch (suitCount) {
+      1 => [CardSuit.values.first],
+      2 => [CardSuit.values.first, CardSuit.spades],
+      4 => CardSuit.values.toList(),
+      _ => CardSuit.values.take(suitCount).toList(),
+    };
     final setsPerSuit =
         8 ~/ suitCount; // 8 sets total divided by number of suits
     var deck = <SpiderCard>[];

@@ -195,7 +195,7 @@ class HomePage extends ConsumerWidget {
             Text(
               'Solitaire Pro Collection',
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -404,34 +404,6 @@ class _GameCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             child: Stack(
               children: [
-                // Positioned(
-                //   top: 12,
-                //   right: 12,
-                //   child: Container(
-                //     padding:
-                //         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                //     decoration: BoxDecoration(
-                //       color: dailyCompleted
-                //           ? Colors.greenAccent.withValues(alpha: 0.8)
-                //           : Colors.orangeAccent.withValues(alpha: 0.9),
-                //       borderRadius: BorderRadius.circular(999),
-                //       boxShadow: [
-                //         BoxShadow(
-                //           color: Colors.black.withValues(alpha: 0.2),
-                //           blurRadius: 6,
-                //         ),
-                //       ],
-                //     ),
-                //     child: Text(
-                //       dailyCompleted ? 'Daily Done' : 'Daily Ready',
-                //       style: const TextStyle(
-                //         color: Colors.black,
-                //         fontWeight: FontWeight.bold,
-                //         fontSize: 12,
-                //       ),
-                //     ),
-                //   ),
-                // ),
                 // Decorative pattern overlay
                 Positioned.fill(
                   child: Opacity(
@@ -479,8 +451,8 @@ class _GameCard extends StatelessWidget {
                       // Game logo
                       Center(
                         child: SizedBox(
-                          width: 158,
-                          height: 158,
+                          width: 120,
+                          height: 120,
                           child: Image.asset(
                             logoAsset,
                             fit: BoxFit.contain,
@@ -530,7 +502,7 @@ class _DifficultySheet extends StatelessWidget {
                 title: difficulty.title,
                 description: difficulty.getDescription(game),
                 onTap: () => onDifficultyChosen(difficulty),
-                highlight: defaultDifficulty == difficulty,
+                highlight: false,
               ),
             )
             .toList()

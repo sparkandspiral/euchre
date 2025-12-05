@@ -325,6 +325,8 @@ class PyramidSolitaireState {
 
   bool get isVictory => pyramid.every((row) => row.isEmpty);
 
+  bool get hasAvailableMoves => findHint() != null;
+
   PyramidSolitaireState copyWith({
     List<List<PyramidCard?>>? pyramid,
     List<PyramidCard>? stock,
@@ -499,6 +501,7 @@ class PyramidSolitaire extends HookConsumerWidget {
           : () => state.value = state.value.withUndo(),
       onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
+      hasMoves: state.value.hasAvailableMoves,
       onVictory: (_, __) async {
         await ref
             .read(achievementServiceProvider)

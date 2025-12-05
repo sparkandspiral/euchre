@@ -166,6 +166,8 @@ class GolfSolitaireState {
   GolfSolitaireState withUndo() => history.last;
 
   bool get isVictory => cards.every((column) => column.isEmpty);
+
+  bool get hasAvailableMoves => findHint() != null;
 }
 
 class GolfSolitaire extends HookConsumerWidget {
@@ -303,6 +305,7 @@ class GolfSolitaire extends HookConsumerWidget {
           : () => state.value = state.value.withUndo(),
       onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
+      hasMoves: state.value.hasAvailableMoves,
       onTutorial: startTutorial,
       onVictory: (_, __) async {
         await ref

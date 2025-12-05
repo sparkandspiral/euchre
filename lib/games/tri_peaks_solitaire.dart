@@ -397,6 +397,7 @@ class TriPeaksSolitaire extends HookConsumerWidget {
           : () => state.value = state.value.withUndo(),
       onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
+      hasMoves: state.value.hasAvailableMoves,
       onTutorial: startTutorial,
       onVictory: (_, __) async {
         await ref

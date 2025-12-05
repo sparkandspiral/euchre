@@ -89,6 +89,7 @@ class SheetOptionTile extends StatelessWidget {
   final bool highlight;
   final Color highlightColor;
   final Widget? trailing;
+  final bool enabled;
 
   const SheetOptionTile({
     super.key,
@@ -99,6 +100,7 @@ class SheetOptionTile extends StatelessWidget {
     this.highlight = false,
     this.highlightColor = const Color(0xFFFFD700),
     this.trailing,
+    this.enabled = true,
   });
 
   @override
@@ -106,66 +108,69 @@ class SheetOptionTile extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: onTap,
+        onTap: enabled ? onTap : null,
         borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: sheetTileColor,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: highlight
-                  ? highlightColor
-                  : Colors.white.withValues(alpha: 0.08),
-              width: 1.4,
+        child: Opacity(
+          opacity: enabled ? 1 : 0.45,
+          child: Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: sheetTileColor,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: highlight
+                    ? highlightColor
+                    : Colors.white.withValues(alpha: 0.08),
+                width: 1.4,
+              ),
             ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              trailing ??
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    color: Colors.white54,
-                    size: 16,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-            ],
+                  child: Icon(
+                    icon,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        description,
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                trailing ??
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      color: Colors.white54,
+                      size: 16,
+                    ),
+              ],
+            ),
           ),
         ),
       ),

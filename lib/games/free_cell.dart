@@ -681,6 +681,8 @@ class FreeCellState {
   bool get isVictory =>
       foundationCards.values.every((cards) => cards.length == 13);
 
+  bool get hasAvailableMoves => findHint() != null;
+
   FreeCellState copyWith({
     List<List<SuitedCard>>? tableauCards,
     List<SuitedCard?>? freeCells,
@@ -846,6 +848,7 @@ class FreeCell extends HookConsumerWidget {
           : () => state.value = state.value.withUndo(),
       onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
+      hasMoves: state.value.hasAvailableMoves,
       onVictory: (_, __) async {
         await ref
             .read(achievementServiceProvider)

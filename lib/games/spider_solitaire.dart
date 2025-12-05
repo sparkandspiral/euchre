@@ -435,6 +435,8 @@ class SpiderSolitaireState {
   bool get canDeal =>
       stock.length >= 10 && revealedCards.every((column) => column.isNotEmpty);
 
+  bool get hasAvailableMoves => findHint() != null;
+
   SpiderSolitaireState copyWith({
     List<List<SpiderCard>>? hiddenCards,
     List<List<SpiderCard>>? revealedCards,
@@ -604,6 +606,7 @@ class SpiderSolitaire extends HookConsumerWidget {
           : () => state.value = state.value.withUndo(),
       onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
+      hasMoves: state.value.hasAvailableMoves,
       onVictory: (_, __) async {
         await ref
           .read(achievementServiceProvider)

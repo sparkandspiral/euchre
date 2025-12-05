@@ -43,6 +43,7 @@ class CardScaffold extends HookConsumerWidget {
   final FutureOr<void> Function(BuildContext context, Duration duration)?
       onVictory;
   final bool isVictory;
+  final bool hasMoves;
   final DailyChallengeConfig? dailyChallenge;
   final Duration initialElapsed;
   final bool disableAds;
@@ -59,6 +60,7 @@ class CardScaffold extends HookConsumerWidget {
     this.onHint,
     this.onVictory,
     this.isVictory = false,
+    this.hasMoves = true,
     this.dailyChallenge,
     this.initialElapsed = Duration.zero,
     this.disableAds = false,
@@ -68,6 +70,7 @@ class CardScaffold extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cardGameContext = context.watch<CardGameContext?>();
     final isPreview = cardGameContext?.isPreview ?? false;
+    final isNoMovesSheetOpen = useRef(false);
 
     final isHintProcessing = useState(false);
     final startTimeState =
@@ -158,6 +161,55 @@ class CardScaffold extends HookConsumerWidget {
       ref.read(saveStateNotifierProvider.notifier).saveGameCloseOrRestart();
       context.pushReplacement(() => HomePage());
     }
+
+    Future<void> openNoMovesSheet() async {
+      if (!context.mounted) return;
+      if (isNoMovesSheetOpen.value) return;
+      isNoMovesSheetOpen.value = true;
+
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) => _NoMovesSheet(
+          gameTitle: game.title,
+          isDailyChallenge: dailyChallenge != null,
+          canUndo: onUndo != null,
+          onUndo: onUndo == null
+              ? null
+              : () {
+                  Navigator.of(sheetContext).pop();
+                  onUndo?.call();
+                },
+          onRestart: () {
+            Navigator.of(sheetContext).pop();
+            restartGame();
+          },
+          onNewGame: dailyChallenge != null
+              ? null
+              : () {
+                  Navigator.of(sheetContext).pop();
+                  startNewGame();
+                },
+        ),
+      );
+
+      if (context.mounted) {
+        isNoMovesSheetOpen.value = false;
+      }
+    }
+
+    useEffect(() {
+      if (hasMoves || isVictory || isPreview) {
+        if (hasMoves) {
+          isNoMovesSheetOpen.value = false;
+        }
+        return null;
+      }
+
+      Future.microtask(() => openNoMovesSheet());
+      return null;
+    }, [hasMoves, isVictory, isPreview]);
 
     Future<void> openMenu() async {
       if (!context.mounted) return;
@@ -327,7 +379,7 @@ class CardScaffold extends HookConsumerWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                 decoration: BoxDecoration(
-                  color: hasHints ? Colors.orange : Colors.grey,
+                  color: Colors.grey,
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(color: Colors.white, width: 1.2),
                 ),
@@ -614,6 +666,59 @@ class CardScaffold extends HookConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _NoMovesSheet extends StatelessWidget {
+  final String gameTitle;
+  final bool isDailyChallenge;
+  final bool canUndo;
+  final VoidCallback? onUndo;
+  final VoidCallback onRestart;
+  final VoidCallback? onNewGame;
+
+  const _NoMovesSheet({
+    required this.gameTitle,
+    required this.isDailyChallenge,
+    required this.canUndo,
+    required this.onUndo,
+    required this.onRestart,
+    required this.onNewGame,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ThemedSheet(
+      title: '$gameTitle Over',
+      subtitle: 'No valid moves remain. Pick how you want to continue.',
+      child: Column(
+        children: [
+          SheetOptionTile(
+            icon: Icons.restart_alt,
+            title: 'Restart Game',
+            description: 'Reset this deal back to the initial layout.',
+            onTap: onRestart,
+            highlight: true,
+          ),
+          SheetOptionTile(
+            icon: Icons.undo,
+            title: 'Undo Last Move',
+            description: 'Rewind a step to try a different line of play.',
+            onTap: onUndo ?? () {},
+            enabled: canUndo && onUndo != null,
+          ),
+          if (onNewGame != null)
+            SheetOptionTile(
+              icon: Icons.star_border,
+              title: isDailyChallenge ? 'Start Over' : 'New Game',
+              description: isDailyChallenge
+                  ? 'Replay this challenge from the beginning.'
+                  : 'Deal a fresh layout and try again.',
+              onTap: onNewGame!,
+            ),
+        ],
+      ),
     );
   }
 }

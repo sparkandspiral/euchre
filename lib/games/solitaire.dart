@@ -514,6 +514,8 @@ class SolitaireState {
   bool get isVictory =>
       completedCards.values.every((cards) => cards.length == 13);
 
+  bool get hasAvailableMoves => findHint() != null;
+
   SolitaireState copyWith({
     List<List<SuitedCard>>? hiddenCards,
     List<List<SuitedCard>>? revealedCards,
@@ -692,6 +694,7 @@ class Solitaire extends HookConsumerWidget {
           : () => state.value = state.value.withUndo(),
       onHint: () => state.value.findHint(),
       isVictory: state.value.isVictory,
+      hasMoves: state.value.hasAvailableMoves,
       onVictory: (_, __) async {
         await ref
             .read(achievementServiceProvider)

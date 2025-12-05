@@ -235,24 +235,29 @@ class FreeCellState {
       freeCells[cellIndex] == null;
 
   HintSuggestion? findHint() {
-    HintSuggestion describeFoundationMove(String source, SuitedCard card) {
-      return HintSuggestion(
-        message:
-            'Move ${describeCard(card)} from $source to the ${describeSuitName(card.suit)} foundation.',
-      );
-    }
-
     for (int column = 0; column < tableauCards.length; column++) {
       final card = tableauCards[column].lastOrNull;
       if (card != null && canAddToFoundation(card)) {
-        return describeFoundationMove(describeColumn(column), card);
+        return HintSuggestion(
+          message:
+              'Move ${describeCard(card)} from ${describeColumn(column)} to the ${describeSuitName(card.suit)} foundation.',
+          fromTarget: 'tableau-$column',
+          toTarget: 'foundation',
+          highlightTargets: ['tableau-$column', 'foundation'],
+        );
       }
     }
 
     for (int cell = 0; cell < freeCells.length; cell++) {
       final card = freeCells[cell];
       if (card != null && canAddToFoundation(card)) {
-        return describeFoundationMove(describeFreeCell(cell), card);
+        return HintSuggestion(
+          message:
+              'Move ${describeCard(card)} from ${describeFreeCell(cell)} to the ${describeSuitName(card.suit)} foundation.',
+          fromTarget: 'free-$cell',
+          toTarget: 'foundation',
+          highlightTargets: ['free-$cell', 'foundation'],
+        );
       }
     }
 
@@ -269,6 +274,9 @@ class FreeCellState {
           return HintSuggestion(
             message:
                 'Play ${describeCard(card)} from ${describeFreeCell(cell)} onto $targetDescription.',
+            fromTarget: 'free-$cell',
+            toTarget: 'tableau-$column',
+            highlightTargets: ['free-$cell', 'tableau-$column'],
           );
         }
       }
@@ -300,6 +308,9 @@ class FreeCellState {
             detail: clearsColumn
                 ? 'This opens ${describeColumn(from)} for future plays.'
                 : null,
+            fromTarget: 'tableau-$from',
+            toTarget: 'tableau-$target',
+            highlightTargets: ['tableau-$from', 'tableau-$target'],
           );
 
           if (clearsColumn) {
@@ -324,6 +335,12 @@ class FreeCellState {
         return HintSuggestion(
           message:
               'Store ${describeCard(card)} from ${describeColumn(columnIndex)} in ${describeFreeCell(emptyCell)} to free space.',
+          fromTarget: 'tableau-$columnIndex',
+          toTarget: 'free-$emptyCell',
+          highlightTargets: [
+            'tableau-$columnIndex',
+            'free-$emptyCell',
+          ],
         );
       }
     }
@@ -778,6 +795,10 @@ class FreeCell extends HookConsumerWidget {
     final tableauKey = useMemoized(() => GlobalKey());
     final foundationKey = useMemoized(() => GlobalKey());
     final freeCellsKey = useMemoized(() => GlobalKey());
+    final tableauColumnKeys =
+        useMemoized(() => List.generate(8, (_) => GlobalKey()));
+    final freeCellKeys =
+        useMemoized(() => List.generate(state.value.freeCells.length, (_) => GlobalKey()));
 
     void startTutorial() {
       showGameTutorial(
@@ -829,6 +850,13 @@ class FreeCell extends HookConsumerWidget {
       dailyChallenge: dailyChallenge,
       initialElapsed:
           Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      hintTargetKeys: {
+        'foundation': foundationKey,
+        for (var i = 0; i < tableauColumnKeys.length; i++)
+          'tableau-$i': tableauColumnKeys[i],
+        for (var i = 0; i < freeCellKeys.length; i++)
+          'free-$i': freeCellKeys[i],
+      },
       onNewGame: () {
         if (dailyChallenge == null) {
           unawaited(clearSnapshot());
@@ -910,6 +938,7 @@ class FreeCell extends HookConsumerWidget {
                           children: [
                             ...state.value.freeCells.mapIndexed((i, card) =>
                                 CardDeck<SuitedCard, GroupValue>(
+                                  key: freeCellKeys[i],
                                   value: FreeCellGroupValue(i),
                                   values: card == null ? [] : [card],
                                   canGrab: true,
@@ -1001,6 +1030,7 @@ class FreeCell extends HookConsumerWidget {
                           final columnCards = state.value.tableauCards[i];
 
                           return CardLinearGroup<SuitedCard, GroupValue>(
+                            key: tableauColumnKeys[i],
                             value: TableauGroupValue(i),
                             cardOffset: axis.inverted.offset * cardOffset,
                             maxGrabStackSize: state.value.maxMoveSize,

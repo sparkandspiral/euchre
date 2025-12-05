@@ -227,6 +227,9 @@ class TriPeaksSolitaireState {
         return HintSuggestion(
           message:
               'Play ${describeCard(card)} from ${describeRowPosition(row, col)} to $target.',
+          fromTarget: 'tableau-$row-$col',
+          toTarget: 'waste',
+          highlightTargets: ['tableau-$row-$col', 'waste'],
         );
       }
     }
@@ -234,6 +237,8 @@ class TriPeaksSolitaireState {
     if (canDraw) {
       return const HintSuggestion(
         message: 'Draw a card from the stock to refresh the waste pile.',
+        fromTarget: 'stock',
+        highlightTargets: ['stock'],
       );
     }
 
@@ -331,6 +336,14 @@ class TriPeaksSolitaire extends HookConsumerWidget {
     final tableauKey = useMemoized(() => GlobalKey());
     final wasteKey = useMemoized(() => GlobalKey());
     final stockKey = useMemoized(() => GlobalKey());
+    final tableauPositionKeys = useMemoized(
+      () => [
+        List.generate(3, (_) => GlobalKey()),
+        List.generate(6, (_) => GlobalKey()),
+        List.generate(9, (_) => GlobalKey()),
+        List.generate(10, (_) => GlobalKey()),
+      ],
+    );
 
     void startTutorial() {
       showGameTutorial(
@@ -381,6 +394,13 @@ class TriPeaksSolitaire extends HookConsumerWidget {
       dailyChallenge: dailyChallenge,
       initialElapsed:
           Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      hintTargetKeys: {
+        'stock': stockKey,
+        'waste': wasteKey,
+        for (var row = 0; row < tableauPositionKeys.length; row++)
+          for (var col = 0; col < tableauPositionKeys[row].length; col++)
+            'tableau-$row-$col': tableauPositionKeys[row][col],
+      },
       onNewGame: () {
         if (dailyChallenge == null) {
           unawaited(clearSnapshot());
@@ -459,6 +479,7 @@ class TriPeaksSolitaire extends HookConsumerWidget {
                     }
                   : null,
               child: CardLinearGroup<SuitedCard, dynamic>(
+                key: tableauPositionKeys[row][col],
                 value: 'card-$row-$col',
                 values: card == null ? const <SuitedCard>[] : [card],
                 maxGrabStackSize: 0,

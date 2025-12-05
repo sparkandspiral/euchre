@@ -150,6 +150,9 @@ class GolfSolitaireState {
             : 'onto $foundationDescription';
         return HintSuggestion(
           message: 'Play ${describeCard(card)} from $source $target.',
+          fromTarget: 'tableau-$column',
+          toTarget: 'foundation',
+          highlightTargets: ['tableau-$column', 'foundation'],
         );
       }
     }
@@ -157,6 +160,9 @@ class GolfSolitaireState {
     if (canDraw) {
       return const HintSuggestion(
         message: 'Draw a new card to refresh the foundation.',
+        fromTarget: 'draw',
+        toTarget: 'foundation',
+        highlightTargets: ['draw', 'foundation'],
       );
     }
 
@@ -239,6 +245,8 @@ class GolfSolitaire extends HookConsumerWidget {
     final tableauKey = useMemoized(() => GlobalKey());
     final foundationKey = useMemoized(() => GlobalKey());
     final drawPileKey = useMemoized(() => GlobalKey());
+    final tableauColumnKeys =
+        useMemoized(() => List.generate(state.value.cards.length, (_) => GlobalKey()));
 
     void startTutorial() {
       showGameTutorial(
@@ -289,6 +297,12 @@ class GolfSolitaire extends HookConsumerWidget {
       dailyChallenge: dailyChallenge,
       initialElapsed:
           Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      hintTargetKeys: {
+        'draw': drawPileKey,
+        'foundation': foundationKey,
+        for (var i = 0; i < tableauColumnKeys.length; i++)
+          'tableau-$i': tableauColumnKeys[i],
+      },
       onNewGame: () {
         if (dailyChallenge == null) {
           unawaited(clearSnapshot());
@@ -345,6 +359,7 @@ class GolfSolitaire extends HookConsumerWidget {
                     children: state.value.cards
                         .mapIndexed((i, column) =>
                             CardLinearGroup<SuitedCard, dynamic>(
+                              key: tableauColumnKeys[i],
                               cardOffset: axis.inverted.offset * cardOffset,
                               value: i,
                               values: column,

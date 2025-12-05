@@ -156,6 +156,14 @@ class SaveStateNotifier extends _$SaveStateNotifier {
     ));
   }
 
+  Future<void> markTutorialPromptSeen(Game game) async {
+    final saveState = await future;
+    if (saveState.tutorialPromptsSeen[game] == true) {
+      return;
+    }
+    await _saveState(saveState.withTutorialPromptSeen(game));
+  }
+
   Future<void> saveActiveGameSnapshot(
       ActiveGameSnapshot snapshot) async {
     final saveState = await future;

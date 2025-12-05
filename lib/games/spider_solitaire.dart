@@ -392,6 +392,9 @@ class SpiderSolitaireState {
             message:
                 'Move $cardsDescription from ${describeColumn(column)} onto $targetDescription.',
             detail: detailParts.isEmpty ? null : detailParts.join(' '),
+            fromTarget: 'tableau-$column',
+            toTarget: 'tableau-$target',
+            highlightTargets: ['tableau-$column', 'tableau-$target'],
           );
 
           final score =
@@ -414,12 +417,15 @@ class SpiderSolitaireState {
     if (canDeal) {
       return const HintSuggestion(
         message: 'Deal one card to each column from the stock.',
+        fromTarget: 'stock',
+        highlightTargets: ['stock'],
       );
     }
 
     if (stock.isNotEmpty && revealedCards.any((column) => column.isEmpty)) {
       return const HintSuggestion(
         message: 'Fill every column before dealing from the stock.',
+        highlightTargets: ['stock'],
       );
     }
 
@@ -536,6 +542,8 @@ class SpiderSolitaire extends HookConsumerWidget {
     final tableauKey = useMemoized(() => GlobalKey());
     final stockKey = useMemoized(() => GlobalKey());
     final completedKey = useMemoized(() => GlobalKey());
+    final tableauGroupKeys =
+        useMemoized(() => List.generate(10, (_) => GlobalKey()));
 
     void startTutorial() {
       showGameTutorial(
@@ -587,6 +595,11 @@ class SpiderSolitaire extends HookConsumerWidget {
       dailyChallenge: dailyChallenge,
       initialElapsed:
           Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      hintTargetKeys: {
+        'stock': stockKey,
+        for (var i = 0; i < tableauGroupKeys.length; i++)
+          'tableau-$i': tableauGroupKeys[i],
+      },
       onNewGame: () {
         if (dailyChallenge == null) {
           unawaited(clearSnapshot());
@@ -764,6 +777,7 @@ class SpiderSolitaire extends HookConsumerWidget {
                           hiddenSpiderCards + revealedSpiderCards;
 
                       return CardLinearGroup<SpiderCard, dynamic>(
+                        key: tableauGroupKeys[i],
                         value: i,
                         cardOffset: axis.inverted.offset * cardOffset,
                         maxGrabStackSize: null,

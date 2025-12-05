@@ -277,6 +277,8 @@ class PyramidSolitaireState {
         return HintSuggestion(
           message:
               'Remove the king ${describeCard(card.card)} at ${describeRowPosition(pos.row, pos.col)}.',
+          fromTarget: 'pyramid',
+          highlightTargets: ['pyramid'],
         );
       }
     }
@@ -292,6 +294,9 @@ class PyramidSolitaireState {
           return HintSuggestion(
             message:
                 'Pair ${describeCard(cardA.card)} at ${describeRowPosition(aPos.row, aPos.col)} with ${describeCard(cardB.card)} at ${describeRowPosition(bPos.row, bPos.col)}.',
+            fromTarget: 'pyramid',
+            toTarget: 'pyramid',
+            highlightTargets: ['pyramid'],
           );
         }
       }
@@ -306,6 +311,9 @@ class PyramidSolitaireState {
           return HintSuggestion(
             message:
                 'Match ${describeCard(pyramidCard.card)} at ${describeRowPosition(pos.row, pos.col)} with the waste card ${describeCard(wasteCard.card)}.',
+            fromTarget: 'pyramid',
+            toTarget: 'waste',
+            highlightTargets: ['pyramid', 'waste'],
           );
         }
       }
@@ -314,6 +322,8 @@ class PyramidSolitaireState {
     if (canDraw) {
       return const HintSuggestion(
         message: 'Draw a new waste card from the stock.',
+        fromTarget: 'stock',
+        highlightTargets: ['stock'],
       );
     }
 
@@ -482,6 +492,11 @@ class PyramidSolitaire extends HookConsumerWidget {
       dailyChallenge: dailyChallenge,
       initialElapsed:
           Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      hintTargetKeys: {
+        'pyramid': pyramidKey,
+        'stock': stockKey,
+        'waste': wasteKey,
+      },
       onNewGame: () {
         if (dailyChallenge == null) {
           unawaited(clearSnapshot());

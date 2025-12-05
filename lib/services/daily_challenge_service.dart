@@ -102,8 +102,14 @@ class DailyChallengeService {
   }
 
   int _seedFor(DateTime date, Game game) {
-    final hash = Object.hash(date.year, date.month, date.day, game.index);
-    return hash & 0x7fffffff;
+    // Object.hash is intentionally randomized between runs. Build a stable,
+    // reproducible seed so the same daily puzzle is dealt after app restarts.
+    //
+    // Formula keeps values in the 32-bit signed int range while combining
+    // the date parts and game index.
+    final dayKey = date.year * 10000 + date.month * 100 + date.day;
+    final mixed = (dayKey * 31) ^ game.index;
+    return mixed & 0x7fffffff;
   }
 }
 

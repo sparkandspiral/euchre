@@ -21,6 +21,7 @@ import 'package:solitaire/utils/axis_extensions.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
 import 'package:solitaire/utils/card_description.dart';
 import 'package:solitaire/utils/suited_card_codec.dart';
+import 'package:solitaire/utils/shuffle.dart';
 import 'package:solitaire/providers/save_state_notifier.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/delayed_auto_move_listener.dart';
@@ -82,8 +83,12 @@ class FreeCellState {
     required bool acesAtBottom,
     int? shuffleSeed,
   }) {
-    final random = shuffleSeed == null ? Random() : Random(shuffleSeed);
-    var deck = List.of(SuitedCard.deck)..shuffle(random);
+    var deck = List.of(SuitedCard.deck);
+    if (shuffleSeed == null) {
+      deck.shuffle();
+    } else {
+      shuffleWithSeed(deck, shuffleSeed);
+    }
 
     final aces =
         deck.where((card) => card.value == AceSuitedCardValue()).toList();

@@ -5,6 +5,7 @@ import 'package:solitaire/model/difficulty.dart';
 import 'package:solitaire/model/game.dart';
 import 'package:solitaire/providers/save_state_notifier.dart';
 import 'package:solitaire/services/leaderboard_service.dart';
+import 'package:solitaire/services/klondike_daily_seed_service.dart';
 
 final dailyChallengeServiceProvider =
     Provider<DailyChallengeService>((ref) => DailyChallengeService(ref));
@@ -102,11 +103,11 @@ class DailyChallengeService {
   }
 
   int _seedFor(DateTime date, Game game) {
-    // Object.hash is intentionally randomized between runs. Build a stable,
-    // reproducible seed so the same daily puzzle is dealt after app restarts.
-    //
-    // Formula keeps values in the 32-bit signed int range while combining
-    // the date parts and game index.
+    if (game == Game.klondike) {
+      return seedForDate(date.toUtc(), klondikeDailySeeds);
+    }
+
+    // Fallback: legacy deterministic seed for other games.
     final dayKey = date.year * 10000 + date.month * 100 + date.day;
     final mixed = (dayKey * 31) ^ game.index;
     return mixed & 0x7fffffff;

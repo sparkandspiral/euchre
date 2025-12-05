@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'dart:async';
 
 import 'package:card_game/card_game.dart';
@@ -24,6 +22,7 @@ import 'package:solitaire/utils/constraints_extensions.dart';
 import 'package:solitaire/providers/save_state_notifier.dart';
 import 'package:solitaire/utils/card_description.dart';
 import 'package:solitaire/utils/suited_card_codec.dart';
+import 'package:solitaire/utils/shuffle.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
 import 'package:utils/utils.dart';
@@ -118,8 +117,11 @@ class SpiderSolitaireState {
       }
     }
 
-    final random = shuffleSeed == null ? Random() : Random(shuffleSeed);
-    deck.shuffle(random);
+    if (shuffleSeed == null) {
+      deck.shuffle();
+    } else {
+      shuffleWithSeed(deck, shuffleSeed);
+    }
 
     // Deal initial tableau: first 4 columns get 6 cards, last 6 get 5 cards
     final hiddenCards = <List<SpiderCard>>[];

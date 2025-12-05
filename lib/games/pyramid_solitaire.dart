@@ -19,6 +19,7 @@ import 'package:solitaire/styles/playing_card_builder.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
 import 'package:solitaire/utils/card_description.dart';
 import 'package:solitaire/utils/suited_card_codec.dart';
+import 'package:solitaire/utils/shuffle.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
 import 'package:utils/utils.dart';
@@ -77,8 +78,12 @@ class PyramidSolitaireState {
     required bool startWithWasteCard,
     int? shuffleSeed,
   }) {
-    final random = shuffleSeed == null ? Random() : Random(shuffleSeed);
-    var suitedDeck = List.of(SuitedCard.deck)..shuffle(random);
+    var suitedDeck = List.of(SuitedCard.deck);
+    if (shuffleSeed == null) {
+      suitedDeck.shuffle();
+    } else {
+      shuffleWithSeed(suitedDeck, shuffleSeed);
+    }
 
     // Optionally bury Aces at bottom of stock to increase difficulty similar to Ace mode patterns
     if (buryAces) {

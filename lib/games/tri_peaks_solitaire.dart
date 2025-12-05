@@ -18,6 +18,7 @@ import 'package:solitaire/styles/playing_card_style.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
 import 'package:solitaire/utils/card_description.dart';
 import 'package:solitaire/utils/suited_card_codec.dart';
+import 'package:solitaire/utils/shuffle.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
 import 'package:utils/utils.dart';
@@ -49,8 +50,12 @@ class TriPeaksSolitaireState {
     required bool canRollover,
     int? shuffleSeed,
   }) {
-    final random = shuffleSeed == null ? Random() : Random(shuffleSeed);
-    var deck = List.of(SuitedCard.deck)..shuffle(random);
+    var deck = List.of(SuitedCard.deck);
+    if (shuffleSeed == null) {
+      deck.shuffle();
+    } else {
+      shuffleWithSeed(deck, shuffleSeed);
+    }
 
     // Classic Tri-Peaks layout: 28 cards in 4 rows forming 3 peaks
     // Row 0 (peaks): 3 cards (indices 0, 1, 2)

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import json
-from dataclasses import dataclass, field
+import os
+from dataclasses import dataclass
 from enum import Enum
 from typing import List, Dict, Optional, Tuple, Set
+from multiprocessing import Pool, cpu_count
 
 # ---------- RNG + shuffle (must match Dart) ----------
 
@@ -22,19 +24,17 @@ class XorShift32:
         return self.state
 
     def next_int(self, max_val: int) -> int:
-        # max_val > 0
         return self._next32() % max_val
 
 
 def shuffle_with_seed(seq: List, seed: int) -> None:
     rng = XorShift32(seed)
-    # Fisher–Yates
     for i in range(len(seq) - 1, 0, -1):
         j = rng.next_int(i + 1)
         seq[i], seq[j] = seq[j], seq[i]
 
 
-# ---------- Card model (must be consistent with Dart) ----------
+# ---------- Card model ----------
 
 class SuitColor(Enum):
     RED = 0
@@ -54,7 +54,6 @@ class Suit(Enum):
         return SuitColor.BLACK
 
 
-# We’ll use 1..13, Ace = 1, King = 13
 ACE = 1
 KING = 13
 
@@ -66,12 +65,10 @@ class Card:
 
     @property
     def id(self) -> int:
-        # Unique id 0..51
         return self.suit.value * 13 + (self.value - 1)
 
 
 def full_deck() -> List[Card]:
-    # Order does not matter as long as Dart uses the same
     return [Card(suit, value)
             for suit in Suit
             for value in range(1, 14)]
@@ -81,17 +78,11 @@ def full_deck() -> List[Card]:
 
 @dataclass
 class SolverState:
-    # 7 tableau columns: hidden + revealed
     hidden: List[List[Card]]
     revealed: List[List[Card]]
-
-    # Stock (face-down) + waste (revealedDeck in your Dart)
     stock: List[Card]
     waste: List[Card]
-
-    # Foundations by suit
     foundations: Dict[Suit, List[Card]]
-
     draw_amount: int
     aces_at_bottom: bool
 
@@ -111,29 +102,21 @@ class SolverState:
         return all(len(pile) == 13 for pile in self.foundations.values())
 
 
-def initial_state_from_seed(seed: int, draw_amount: int = 1, aces_at_bottom: bool = False) -> SolverState:
+def initial_state_from_seed(seed: int,
+                            draw_amount: int = 1,
+                            aces_at_bottom: bool = False) -> SolverState:
     deck = full_deck()
     shuffle_with_seed(deck, seed)
 
-    # Mirror your Dart logic:
-    # final aces = deck.where(card.value == Ace).toList();
     aces = [c for c in deck if c.value == ACE]
     if aces_at_bottom:
         deck = [c for c in deck if c.value != ACE]
 
-    hidden = []
-    # hiddenCards columns
-    # for i in 0..6:
-    #   if acesAtBottom && i >= 3 && i < 7 && aces.isNotEmpty:
-    #       column = [ace] + deck.take(i-1)
-    #   else:
-    #       column = deck.take(i)
-    #   then deck = deck.skip(...)
+    hidden: List[List[Card]] = []
     from_index = 0
     for i in range(7):
-        column = []
+        column: List[Card] = []
         if aces_at_bottom and i >= 3 and i < 7 and aces:
-            # place an ace + (i-1) cards from deck
             column.append(aces.pop(0))
             take = i - 1
         else:
@@ -144,8 +127,7 @@ def initial_state_from_seed(seed: int, draw_amount: int = 1, aces_at_bottom: boo
 
     deck = deck[from_index:]
 
-    # Now revealed: one card per column from deck
-    revealed = []
+    revealed: List[List[Card]] = []
     from_index = 0
     for i in range(7):
         card = deck[from_index]
@@ -159,18 +141,17 @@ def initial_state_from_seed(seed: int, draw_amount: int = 1, aces_at_bottom: boo
     return SolverState(
         hidden=hidden,
         revealed=revealed,
-        stock=deck,   # face-down pile
-        waste=[],     # revealedDeck
+        stock=deck,
+        waste=[],
         foundations=foundations,
         draw_amount=draw_amount,
         aces_at_bottom=aces_at_bottom,
     )
 
 
-# ---------- Rules (mirror your Dart logic) ----------
+# ---------- Rules ----------
 
 def card_value(card: Card) -> int:
-    # Ace as lowest = 1, same as our value field
     return card.value
 
 
@@ -186,7 +167,6 @@ def can_move_onto(state: SolverState, moving_top: Card, target_col_idx: int) -> 
     target_top = target_col[-1] if target_col else None
 
     if target_top is None:
-        # Only Kings can go to empty column
         return moving_top.value == KING
 
     return (card_value(moving_top) + 1 == card_value(target_top) and
@@ -206,20 +186,14 @@ def is_descending_alternating(cards: List[Card]) -> bool:
     return True
 
 
-# ---------- State transitions ----------
-
 def draw_or_recycle(state: SolverState) -> None:
     if not state.stock:
-        # recycle
         state.stock = list(reversed(state.waste))
         state.waste.clear()
     else:
-        # draw draw_amount cards from end of stock into waste
         draw = min(state.draw_amount, len(state.stock))
-        # Dart: revealedDeck + deck.reversed.take(drawAmount)
-        # That means take from stock end, push into waste in face-up order
         for _ in range(draw):
-            card = state.stock.pop()  # from end
+            card = state.stock.pop()
             state.waste.append(card)
 
 
@@ -231,14 +205,11 @@ def move_tableau_to_foundation(state: SolverState, col_idx: int) -> bool:
     if not can_complete(state, card):
         return False
 
-    # Remove from revealed
     col.pop()
-    # If empty and hidden has cards, flip last hidden
     if not col and state.hidden[col_idx]:
         flipped = state.hidden[col_idx].pop()
         col.append(flipped)
 
-    # Add to foundations
     state.foundations[card.suit].append(card)
     return True
 
@@ -254,7 +225,10 @@ def move_waste_to_foundation(state: SolverState) -> bool:
     return True
 
 
-def move_tableau_to_tableau(state: SolverState, from_idx: int, start_index: int, to_idx: int) -> bool:
+def move_tableau_to_tableau(state: SolverState,
+                            from_idx: int,
+                            start_index: int,
+                            to_idx: int) -> bool:
     if from_idx == to_idx:
         return False
     source_revealed = state.revealed[from_idx]
@@ -266,11 +240,9 @@ def move_tableau_to_tableau(state: SolverState, from_idx: int, start_index: int,
     if not can_move_onto(state, moving[0], to_idx):
         return False
 
-    # Do move
     del source_revealed[start_index:]
     state.revealed[to_idx].extend(moving)
 
-    # If we emptied revealed[from_idx], flip hidden if any
     if not source_revealed and state.hidden[from_idx]:
         flipped = state.hidden[from_idx].pop()
         source_revealed.append(flipped)
@@ -294,31 +266,37 @@ def move_waste_to_tableau(state: SolverState, to_idx: int) -> bool:
 @dataclass
 class Move:
     kind: str
-    # for tableau moves
     from_col: Optional[int] = None
     to_col: Optional[int] = None
-    start_index: Optional[int] = None  # index in from_col's revealed
-    # draw has no extra fields
+    start_index: Optional[int] = None
 
 
 def generate_moves(state: SolverState) -> List[Move]:
-    moves: List[Move] = []
+    """Return moves ordered roughly from 'good' to 'less good'."""
+    foundation_moves: List[Move] = []
+    reveal_moves: List[Move] = []
+    other_moves: List[Move] = []
+    draw_moves: List[Move] = []
 
-    # 1) tableau -> foundation
+    # tableau -> foundation
     for col_idx in range(7):
-        if state.revealed[col_idx]:
-            card = state.revealed[col_idx][-1]
+        col = state.revealed[col_idx]
+        if col:
+            card = col[-1]
             if can_complete(state, card):
-                moves.append(Move("tableau_to_foundation", from_col=col_idx))
+                foundation_moves.append(Move("tableau_to_foundation",
+                                             from_col=col_idx))
 
-    # 2) waste -> foundation
+    # waste -> foundation
     if state.waste:
         if can_complete(state, state.waste[-1]):
-            moves.append(Move("waste_to_foundation"))
+            foundation_moves.append(Move("waste_to_foundation"))
 
-    # 3) tableau sequences -> tableau
+    # tableau sequences -> tableau
     for from_idx in range(7):
         source = state.revealed[from_idx]
+        if not source:
+            continue
         for start_idx in range(len(source)):
             moving = source[start_idx:]
             if not moving:
@@ -328,51 +306,50 @@ def generate_moves(state: SolverState) -> List[Move]:
             for to_idx in range(7):
                 if to_idx == from_idx:
                     continue
-                if can_move_onto(state, moving[0], to_idx):
-                    moves.append(Move(
-                        "tableau_to_tableau",
-                        from_col=from_idx,
-                        to_col=to_idx,
-                        start_index=start_idx,
-                    ))
+                if not can_move_onto(state, moving[0], to_idx):
+                    continue
+                # does this move reveal a hidden card?
+                reveals = (start_idx == 0 and
+                           len(moving) == len(source) and
+                           len(state.hidden[from_idx]) > 0)
+                m = Move("tableau_to_tableau",
+                         from_col=from_idx,
+                         to_col=to_idx,
+                         start_index=start_idx)
+                (reveal_moves if reveals else other_moves).append(m)
 
-    # 4) waste -> tableau
+    # waste -> tableau
     if state.waste:
         top = state.waste[-1]
         for to_idx in range(7):
             if can_move_onto(state, top, to_idx):
-                moves.append(Move("waste_to_tableau", to_col=to_idx))
+                other_moves.append(Move("waste_to_tableau", to_col=to_idx))
 
-    # 5) draw / recycle
+    # draw / recycle
     if state.stock or state.waste:
-        moves.append(Move("draw"))
+        draw_moves.append(Move("draw"))
 
-    return moves
+    return foundation_moves + reveal_moves + other_moves + draw_moves
 
 
 def apply_move(state: SolverState, move: Move) -> SolverState:
     s = state.clone()
-
     if move.kind == "tableau_to_foundation":
-        assert move.from_col is not None
         move_tableau_to_foundation(s, move.from_col)
     elif move.kind == "waste_to_foundation":
         move_waste_to_foundation(s)
     elif move.kind == "tableau_to_tableau":
-        assert move.from_col is not None and move.to_col is not None and move.start_index is not None
         move_tableau_to_tableau(s, move.from_col, move.start_index, move.to_col)
     elif move.kind == "waste_to_tableau":
-        assert move.to_col is not None
         move_waste_to_tableau(s, move.to_col)
     elif move.kind == "draw":
         draw_or_recycle(s)
     else:
         raise ValueError(f"Unknown move kind: {move.kind}")
-
     return s
 
 
-# ---------- State hashing for cycle detection ----------
+# ---------- State hashing ----------
 
 def hash_state(state: SolverState) -> int:
     ints: List[int] = []
@@ -380,7 +357,7 @@ def hash_state(state: SolverState) -> int:
     def push_cards(cards: List[Card]):
         for c in cards:
             ints.append(c.id)
-        ints.append(999)  # separator
+        ints.append(999)
 
     for col in state.hidden:
         push_cards(col)
@@ -418,10 +395,7 @@ def solve_seed(seed: int,
         if state.is_victory:
             return SolveResult(True, nodes)
 
-        moves = generate_moves(state)
-        # Optional heuristic: try foundation moves first
-        # We could sort by kind, but for now just use order as generated.
-        for m in moves:
+        for m in generate_moves(state):
             next_state = apply_move(state, m)
             h = hash_state(next_state)
             if h not in visited:
@@ -431,51 +405,93 @@ def solve_seed(seed: int,
     return SolveResult(False, nodes)
 
 
-# ---------- Seed mining & JSON output ----------
+# ---------- Parallel mining ----------
 
-def mine_seeds(target_count: int,
-               draw_amount: int = 1,
-               aces_at_bottom: bool = False,
-               node_limit: int = 200_000,
-               min_nodes: int = 5_000,
-               max_nodes: int = 50_000) -> List[int]:
-    """Find seeds that are solvable and roughly 'medium' difficulty."""
-    seeds: List[int] = []
+def worker_task(args) -> Tuple[int, bool, int]:
+    seed, draw_amount, aces_at_bottom, node_limit = args
+    res = solve_seed(seed, draw_amount, aces_at_bottom, node_limit)
+    return seed, res.solved, res.nodes_expanded
+
+
+def load_existing_seeds(path: str) -> Set[int]:
+    if not os.path.exists(path):
+        return set()
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return set(int(s) for s in data.get("seeds", []))
+    except Exception:
+        return set()
+
+
+def save_seeds(path: str, seeds: Set[int]) -> None:
+    # Sorted for deterministic file
+    data = {"seeds": sorted(seeds)}
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, separators=(",", ":"))
+    os.replace(tmp, path)
+
+
+def mine_seeds_parallel(
+    outfile: str,
+    target_count: int,
+    draw_amount: int = 1,
+    aces_at_bottom: bool = False,
+    node_limit: int = 200_000,
+    min_nodes: int = 5_000,
+    max_nodes: int = 50_000,
+    batch_size: int = 200,
+) -> None:
+    existing = load_existing_seeds(outfile)
+    print(f"Loaded {len(existing)} existing seeds from {outfile}")
+
+    found: Set[int] = set(existing)
     seed = 0
 
-    while len(seeds) < target_count:
-        res = solve_seed(seed, draw_amount, aces_at_bottom, node_limit)
-        if res.solved and min_nodes <= res.nodes_expanded <= max_nodes:
-            print(f"Seed {seed} OK (nodes={res.nodes_expanded})")
-            seeds.append(seed)
-        else:
-            print(f"Seed {seed} skipped (solved={res.solved}, nodes={res.nodes_expanded})")
-        seed += 1
+    # Skip seeds we've already found (so we don't spam prints for known ones)
+    if found:
+        seed = max(found) + 1
 
-    return seeds
+    with Pool(processes=cpu_count()) as pool:
+        while len(found) < target_count:
+            batch = list(range(seed, seed + batch_size))
+            seed += batch_size
+
+            args_iter = [
+                (s, draw_amount, aces_at_bottom, node_limit) for s in batch
+            ]
+
+            for s, solved, nodes in pool.imap_unordered(worker_task, args_iter):
+                if solved and min_nodes <= nodes <= max_nodes:
+                    if s not in found:
+                        found.add(s)
+                        print(f"Seed {s} OK (nodes={nodes})  [total={len(found)}]")
+                        # write immediately so we can kill anytime
+                        save_seeds(outfile, found)
+                else:
+                    print(f"Seed {s} skipped (solved={solved}, nodes={nodes})")
+
+                if len(found) >= target_count:
+                    break
+
+    print(f"Done. Found {len(found)} seeds.")
 
 
 def main():
-    # Adjust these for how many you want:
-    MEDIUM_SEED_COUNT = 200  # for example
+    OUT_FILE = "klondike_medium_seeds.json"
+    TARGET_COUNT = 200  # how many seeds you want
 
-    seeds = mine_seeds(
-        target_count=MEDIUM_SEED_COUNT,
+    mine_seeds_parallel(
+        outfile=OUT_FILE,
+        target_count=TARGET_COUNT,
         draw_amount=1,          # classic
-        aces_at_bottom=False,   # Difficulty.ace would be True here
+        aces_at_bottom=False,   # Difficulty.ace => True
         node_limit=200_000,
-        min_nodes=5_000,        # tune ranges after you see distribution
+        min_nodes=5_000,        # tune difficulty
         max_nodes=50_000,
+        batch_size=200,
     )
-
-    data = {
-        "seeds": seeds
-    }
-
-    with open("klondike_medium_seeds.json", "w", encoding="utf-8") as f:
-        json.dump(data, f, separators=(",", ":"))
-
-    print("Wrote klondike_medium_seeds.json")
 
 
 if __name__ == "__main__":

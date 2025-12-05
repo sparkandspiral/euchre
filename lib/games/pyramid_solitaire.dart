@@ -261,14 +261,7 @@ class PyramidSolitaireState {
   }
 
   HintSuggestion? findHint() {
-    final exposedPositions = <PyramidCardPos>[];
-    for (var row = 0; row < pyramid.length; row++) {
-      for (var col = 0; col < pyramid[row].length; col++) {
-        if (isExposed(row, col)) {
-          exposedPositions.add(PyramidCardPos(row, col));
-        }
-      }
-    }
+    final exposedPositions = getExposedPositions();
 
     for (final pos in exposedPositions) {
       final card = pyramid[pos.row][pos.col];

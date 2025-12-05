@@ -86,6 +86,55 @@ class CardScaffold extends HookConsumerWidget {
 
     final saveState = ref.watch(saveStateNotifierProvider).valueOrNull;
     final difficultyGameState = saveState?.gameStates[game]?.states[difficulty];
+    final tutorialPrompted = useRef(false);
+
+    Future<void> maybePromptTutorial() async {
+      if (tutorialPrompted.value || isPreview || saveState == null) {
+        return;
+      }
+
+      final alreadyAsked = saveState.tutorialPromptsSeen[game] == true;
+      if (alreadyAsked) {
+        tutorialPrompted.value = true;
+        return;
+      }
+
+      final result = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('Do you know how to play ${game.title}?'),
+          content: const Text(
+            'If not, we can start with a quick walkthrough before your first game.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('I know it'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Teach me'),
+            ),
+          ],
+        ),
+      );
+
+      tutorialPrompted.value = true;
+      await ref.read(saveStateNotifierProvider.notifier).markTutorialPromptSeen(game);
+      if (!context.mounted) return;
+
+      if (result == true) {
+        await Future.delayed(const Duration(milliseconds: 200));
+        if (!context.mounted) return;
+        onTutorial();
+      }
+    }
+
+    useEffect(() {
+      Future.microtask(maybePromptTutorial);
+      return null;
+    }, [saveState, isPreview]);
 
     useEffect(() {
       if (isVictory) {
@@ -364,14 +413,6 @@ class CardScaffold extends HookConsumerWidget {
 
         if (!context.mounted) return;
         lastHintSignature.value = signature ?? lastHintSignature.value;
-        final detail = hint.detail;
-        final text = detail == null ? hint.message : '${hint.message}\n$detail';
-        messenger?.showSnackBar(
-          SnackBar(
-            content: Text(text),
-            duration: Duration(milliseconds: 1600),
-          ),
-        );
 
         if (hintTargetKeys != null && hintTargetKeys!.isNotEmpty) {
           hintTimer.value?.cancel();

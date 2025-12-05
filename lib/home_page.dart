@@ -89,41 +89,6 @@ class HomePage extends ConsumerWidget {
                 ),
       };
 
-  Future<bool> _promptTutorialIfNeeded({
-    required BuildContext context,
-    required WidgetRef ref,
-    required Game game,
-  }) async {
-    final notifier = ref.read(saveStateNotifierProvider.notifier);
-    final saveState = await ref.read(saveStateNotifierProvider.future);
-    final alreadyAsked = saveState.tutorialPromptsSeen[game] ?? false;
-    if (alreadyAsked || !context.mounted) return false;
-
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Do you know how to play ${game.title}?'),
-        content: const Text(
-          'If not, we can start with a quick walkthrough before your first game.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('I know it'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Teach me'),
-          ),
-        ],
-      ),
-    );
-
-    await notifier.markTutorialPromptSeen(game);
-    return result ?? false;
-  }
-
   Future<void> _startGame({
     required BuildContext context,
     required WidgetRef ref,
@@ -133,8 +98,7 @@ class HomePage extends ConsumerWidget {
     DailyChallengeConfig? dailyChallenge,
     ActiveGameSnapshot? snapshot,
   }) async {
-    final startWithTutorial =
-        await _promptTutorialIfNeeded(context: context, ref: ref, game: game);
+    const startWithTutorial = false;
     context.pushReplacement(
       () => GameView(
         cardGame: builder(

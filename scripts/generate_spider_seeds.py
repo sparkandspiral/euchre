@@ -1,148 +1,209 @@
 #!/usr/bin/env python3
-import json, os, multiprocessing
+"""
+Spider seed mining (classic = 1-suit) matching the Dart implementation:
+`SpiderSolitaireState.getInitialState` + move/deal/sequence removal rules.
+"""
+import argparse
+import json
+import os
+import multiprocessing
+from typing import List, Tuple
+
 from shared_rng import shuffle_with_seed
 
-OUT_FILE="spider_easy_seeds.json"
-TARGET_COUNT=365
-NODE_LIMIT=200000
-
-def rank(card): return (card%13)+1
+DEFAULT_OUT_FILE = "spider_easy_seeds.json"
 
 
-def initial_state(seed):
-    deck=list(range(104))  # 2 full decks
-    shuffle_with_seed(deck,seed)
+def rank(card_id: int) -> int:
+    # deck is 8 sets of 13 ranks; rank is id % 13
+    return (card_id % 13) + 1
 
-    tableau=[[] for _ in range(10)]
-    idx=0
-    # deal 6 to first 4, 5 to rest
+
+def initial_state(seed: int) -> Tuple[List[List[int]], List[List[int]], List[int], int]:
+    """
+    Returns (hidden_cols, revealed_cols, stock, completed_sequences).
+    Stock order matches Dart: new cards are dealt from the FRONT of stock (index 0).
+    """
+    deck = list(range(104))  # 8 sets of 13 (classic 1-suit)
+    shuffle_with_seed(deck, seed)
+
+    hidden: List[List[int]] = []
+    revealed: List[List[int]] = []
+
     for i in range(10):
-        n=6 if i<4 else 5
-        tableau[i].extend(deck[idx:idx+n])
-        idx+=n
+        cards_in_col = 6 if i < 4 else 5
+        hidden_col = deck[: cards_in_col - 1]
+        deck = deck[cards_in_col - 1 :]
+        revealed_col = [deck[0]]
+        deck = deck[1:]
+        hidden.append(hidden_col)
+        revealed.append(revealed_col)
 
-    # all tableau dealt face-down except top card:
-    # Your Dart code uses SuitedCard suits but 1-suit means we ignore suit matching.
-    # We'll treat all as identical suit but distinct IDs.
-
-    # stock = remaining cards
-    stock=[]
-    while idx<len(deck):
-        stock.append(deck[idx:idx+10])
-        idx+=10
-
-    return tableau,stock
+    stock = deck  # remaining
+    return hidden, revealed, stock, 0
 
 
-def can_stack(top,below):
-    return rank(top)+1 == rank(below)
+def is_descending(cards: List[int]) -> bool:
+    for i in range(len(cards) - 1):
+        if rank(cards[i]) != rank(cards[i + 1]) + 1:
+            return False
+    return True
 
 
-def serialize(tableau,stock):
+def can_place_on(target_top: int, moving_bottom: int) -> bool:
+    return rank(moving_bottom) + 1 == rank(target_top)
+
+
+def flip_if_needed(hidden: List[List[int]], revealed: List[List[int]], col: int) -> None:
+    if revealed[col]:
+        return
+    if hidden[col]:
+        revealed[col].append(hidden[col].pop())
+
+
+def remove_complete_sequences(hidden: List[List[int]], revealed: List[List[int]]) -> int:
+    """
+    Mimics Dart `_checkAndRemoveCompleteSequences`:
+    - If last 13 revealed cards are a descending King->Ace run, remove them.
+    - Then flip a hidden card if revealed becomes empty.
+    Returns the number of sequences removed.
+    """
+    removed = 0
+    for i in range(10):
+        col = revealed[i]
+        if len(col) < 13:
+            continue
+        last13 = col[-13:]
+        if rank(last13[0]) == 13 and rank(last13[-1]) == 1 and is_descending(last13):
+            del col[-13:]
+            removed += 1
+            flip_if_needed(hidden, revealed, i)
+    return removed
+
+
+def serialize(hidden: List[List[int]], revealed: List[List[int]], stock: List[int], completed: int):
     return (
-        tuple(tuple(col) for col in tableau),
-        tuple(tuple(row) for row in stock)
+        tuple(tuple(c) for c in hidden),
+        tuple(tuple(c) for c in revealed),
+        tuple(stock),
+        completed,
     )
 
 
-def solve(seed):
-    tableau,stock = initial_state(seed)
-    visited=set()
-    nodes=0
+def solve(seed: int, node_limit: int) -> Tuple[bool, int]:
+    hidden, revealed, stock, completed = initial_state(seed)
 
-    # each frame: tableau, stock
-    stack=[(tableau,stock)]
+    visited = set()
+    nodes = 0
+    stack = [(hidden, revealed, stock, completed)]
 
     while stack:
-        tab,stk = stack.pop()
-        key=serialize(tab,stk)
-        if key in visited: continue
+        hidden, revealed, stock, completed = stack.pop()
+        key = serialize(hidden, revealed, stock, completed)
+        if key in visited:
+            continue
         visited.add(key)
 
-        nodes+=1
-        if nodes>NODE_LIMIT: return False,nodes
+        nodes += 1
+        if nodes > node_limit:
+            return False, nodes
 
-        # remove complete sequences
-        newtab=[list(col) for col in tab]
-        removed_any=True
-        while removed_any:
-            removed_any=False
-            for ci,col in enumerate(newtab):
-                if len(col)>=13:
-                    seq=col[-13:]
-                    if all(rank(seq[i])==rank(seq[i+1])+1 for i in range(12)):
-                        newtab[ci]=col[:-13]
-                        removed_any=True
-        tab=newtab
+        # Remove completed sequences after every move/deal just like the UI
+        h2 = [list(c) for c in hidden]
+        r2 = [list(c) for c in revealed]
+        completed2 = completed + remove_complete_sequences(h2, r2)
+        hidden, revealed, completed = h2, r2, completed2
 
-        # victory?
-        if all(len(col)==0 for col in tab) and not stk:
-            return True,nodes
+        if completed == 8:
+            return True, nodes
 
-        # moves: for each col, each descending sequence, move to another col
-        for ci,col in enumerate(tab):
-            # find sequences
-            for start in range(len(col)-1):
-                if not (rank(col[start])==rank(col[start+1])+1):
+        # Moves: move any descending revealed suffix between columns
+        for from_col in range(10):
+            src = revealed[from_col]
+            if not src:
+                continue
+
+            for start_idx in range(len(src)):
+                moving = src[start_idx:]
+                if not is_descending(moving):
                     continue
-                # sequence begins at start
-                seq=col[start:]
-                for ti,tcol in enumerate(tab):
-                    if ti==ci: continue
-                    if not tcol:
-                        nc=[list(c) for c in tab]
-                        ns=[list(r) for r in stk]
-                        mv=nc[ci][start:]
-                        del nc[ci][start:]
-                        nc[ti].extend(mv)
-                        stack.append((nc,ns))
-                    else:
-                        if can_stack(tcol[-1],seq[0]):
-                            nc=[list(c) for c in tab]
-                            ns=[list(r) for r in stk]
-                            mv=nc[ci][start:]
-                            del nc[ci][start:]
-                            nc[ti].extend(mv)
-                            stack.append((nc,ns))
 
-        # deal from stock
-        if stk and all(col for col in tab):  # cannot deal if any column empty
-            nextrow=stk[-1]
-            ns=[list(r) for r in stk[:-1]]
-            nc=[list(c) for c in tab]
-            for ci in range(10):
-                nc[ci].append(nextrow[ci])
-            stack.append((nc,ns))
+                moving_bottom = moving[0]
 
-    return False,nodes
+                for to_col in range(10):
+                    if to_col == from_col:
+                        continue
+                    dst = revealed[to_col]
+                    if dst and not can_place_on(dst[-1], moving_bottom):
+                        continue
+
+                    nh = [list(c) for c in hidden]
+                    nr = [list(c) for c in revealed]
+                    ns = list(stock)
+                    nc = completed
+
+                    mv = nr[from_col][start_idx:]
+                    del nr[from_col][start_idx:]
+                    nr[to_col].extend(mv)
+                    flip_if_needed(nh, nr, from_col)
+                    nc += remove_complete_sequences(nh, nr)
+                    stack.append((nh, nr, ns, nc))
+
+        # Deal from stock: only if all columns have at least one revealed card
+        if len(stock) >= 10 and all(col for col in revealed):
+            nh = [list(c) for c in hidden]
+            nr = [list(c) for c in revealed]
+            ns = list(stock)
+            nc = completed
+
+            deal = ns[:10]
+            ns = ns[10:]
+            for i in range(10):
+                nr[i].append(deal[i])
+
+            nc += remove_complete_sequences(nh, nr)
+            stack.append((nh, nr, ns, nc))
+
+    return False, nodes
 
 
-def worker(seed):
-    ok,n=solve(seed)
+def worker(args):
+    seed, node_limit = args
+    ok, _ = solve(seed, node_limit=node_limit)
     return seed if ok else None
 
 
 def main():
-    if os.path.exists(OUT_FILE):
-        seeds=json.load(open(OUT_FILE))["seeds"]
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", default=DEFAULT_OUT_FILE)
+    ap.add_argument("--target", type=int, default=365)
+    ap.add_argument("--node-limit", type=int, default=200_000)
+    ap.add_argument("--batch", type=int, default=100)
+    args = ap.parse_args()
+
+    if os.path.exists(args.out):
+        existing = json.load(open(args.out, "r", encoding="utf-8")).get("seeds", [])
     else:
-        seeds=[]
+        existing = []
 
-    found=set(seeds)
-    seed=0
-    pool=multiprocessing.Pool()
+    found = set(int(s) for s in existing)
+    seed = (max(found) + 1) if found else 0
 
-    while len(found)<TARGET_COUNT:
-        batch=range(seed,seed+100)
-        results=pool.map(worker,batch)
-        for r in results:
-            if r is not None:
-                found.add(r)
-                json.dump({"seeds":sorted(found)},open(OUT_FILE,"w"))
-                print("FOUND",r)
-        seed+=100
+    with multiprocessing.Pool() as pool:
+        while len(found) < args.target:
+            batch = list(range(seed, seed + args.batch))
+            seed += args.batch
+            task_args = [(s, args.node_limit) for s in batch]
+            results = pool.map(worker, task_args)
+            for r in results:
+                if r is not None and r not in found:
+                    found.add(r)
+                    print("FOUND", r, f"[total={len(found)}]")
+                    with open(args.out, "w", encoding="utf-8") as f:
+                        json.dump({"seeds": sorted(found)}, f, separators=(",", ":"))
 
-    print("DONE",len(found))
+    print("DONE", len(found))
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     main()

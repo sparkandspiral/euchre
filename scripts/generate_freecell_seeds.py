@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
-import json, os, multiprocessing
+import argparse
+import json
+import os
+import multiprocessing
+from typing import List, Optional, Tuple
+
 from shared_rng import shuffle_with_seed
 
-OUT_FILE="freecell_easy_seeds.json"
-TARGET_COUNT=365
-NODE_LIMIT=200000
+# Default output mirrors other generators.
+DEFAULT_OUT_FILE = "freecell_easy_seeds.json"
 
-# suit: 0–3 → black, red, black, red
-def suit(card): return card//13
-def color(card): return suit(card)%2
-def rank(card): return (card%13)+1
+# suit: 0–3 → black, red, black, red (matches Dart's CardSuit ordering)
+def suit(card: int) -> int: return card // 13
+def color(card: int) -> int: return suit(card) % 2
+def rank(card: int) -> int: return (card % 13) + 1
 
 
 def can_stack(a,b):
@@ -21,20 +25,38 @@ def free_capacity(free, empty):
     return (free+1)*(2**empty)
 
 
-def initial_state(seed):
-    deck=list(range(52))
-    shuffle_with_seed(deck,seed)
+def _deal_freecell_like_dart(deck: List[int], aces_at_bottom: bool) -> List[List[int]]:
+    """
+    Deal tableau EXACTLY like `FreeCellState.getInitialState` in Dart:
+    - 8 columns
+    - columns 0..3 have 7 cards, columns 4..7 have 6 cards
+    - if aces_at_bottom: remove aces from deck, then insert an Ace at index 0 of cols 0..3
+      (while taking one fewer card from deck for those columns)
+    """
+    aces: List[int] = [c for c in deck if rank(c) == 1]
+    if aces_at_bottom:
+        deck[:] = [c for c in deck if rank(c) != 1]
 
-    casc=[[] for _ in range(8)]
-    i=0
-    while i<52:
-        for c in range(8):
-            if i>=52: break
-            casc[c].append(deck[i]); i+=1
+    tableau: List[List[int]] = []
+    for i in range(8):
+        cards_per_col = 7 if i < 4 else 6
+        cards_to_take = cards_per_col - (1 if (aces_at_bottom and i < 4) else 0)
+        col = deck[:cards_to_take]
+        del deck[:cards_to_take]
+        if aces_at_bottom and i < 4 and aces:
+            col.insert(0, aces.pop(0))
+        tableau.append(col)
+    return tableau
 
-    free=[None]*4
-    found=[0,0,0,0]
-    return casc,free,found
+
+def initial_state(seed: int, free_cell_count: int = 4, aces_at_bottom: bool = False):
+    deck = list(range(52))
+    shuffle_with_seed(deck, seed)
+
+    tableau = _deal_freecell_like_dart(deck, aces_at_bottom=aces_at_bottom)
+    free: List[Optional[int]] = [None] * free_cell_count
+    found = [0, 0, 0, 0]
+    return tableau, free, found
 
 
 def serialize(casc,free,found):
@@ -45,8 +67,10 @@ def serialize(casc,free,found):
     )
 
 
-def solve(seed):
-    casc,free,found = initial_state(seed)
+def solve(seed: int, free_cell_count: int, aces_at_bottom: bool, node_limit: int):
+    casc, free, found = initial_state(
+        seed, free_cell_count=free_cell_count, aces_at_bottom=aces_at_bottom
+    )
 
     visited=set()
     nodes=0
@@ -59,8 +83,9 @@ def solve(seed):
         if key in visited: continue
         visited.add(key)
 
-        nodes+=1
-        if nodes>NODE_LIMIT: return False,nodes
+        nodes += 1
+        if nodes > node_limit:
+            return False, nodes
 
         # victory?
         if all(f==13 for f in found):
@@ -160,37 +185,49 @@ def solve(seed):
                             nc[ti].extend(mv)
                             stack.append((nc,nf,nfd))
 
-    return False,nodes
+    return False, nodes
 
 
-def worker(seed):
-    ok,n=solve(seed)
+def worker(args: Tuple[int, int, bool, int]):
+    seed, free_cell_count, aces_at_bottom, node_limit = args
+    ok, _ = solve(seed, free_cell_count, aces_at_bottom, node_limit)
     return seed if ok else None
 
 
 def main():
-    if os.path.exists(OUT_FILE):
-        seeds=json.load(open(OUT_FILE))["seeds"]
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", default=DEFAULT_OUT_FILE)
+    ap.add_argument("--target", type=int, default=365)
+    ap.add_argument("--node-limit", type=int, default=200_000)
+    ap.add_argument("--batch", type=int, default=200)
+    ap.add_argument("--free-cells", type=int, default=4)
+    ap.add_argument("--aces-at-bottom", action="store_true")
+    args = ap.parse_args()
+
+    if os.path.exists(args.out):
+        existing = json.load(open(args.out, "r", encoding="utf-8")).get("seeds", [])
     else:
-        seeds=[]
+        existing = []
 
-    found=set(seeds)
-    seed=0
-    pool=multiprocessing.Pool()
+    found = set(int(s) for s in existing)
+    seed = (max(found) + 1) if found else 0
 
-    while len(found)<TARGET_COUNT:
-        batch=range(seed,seed+100)
-        results=pool.map(worker,batch)
+    with multiprocessing.Pool() as pool:
+        while len(found) < args.target:
+            batch = list(range(seed, seed + args.batch))
+            seed += args.batch
 
-        for r in results:
-            if r is not None:
-                found.add(r)
-                print("FOUND",r)
-                json.dump({"seeds":sorted(found)},open(OUT_FILE,"w"))
+            task_args = [(s, args.free_cells, args.aces_at_bottom, args.node_limit) for s in batch]
+            results = pool.map(worker, task_args)
 
-        seed+=100
+            for r in results:
+                if r is not None and r not in found:
+                    found.add(r)
+                    print("FOUND", r, f"[total={len(found)}]")
+                    with open(args.out, "w", encoding="utf-8") as f:
+                        json.dump({"seeds": sorted(found)}, f, separators=(",", ":"))
 
-    print("DONE",len(found))
+    print("DONE", len(found))
 
 if __name__=="__main__":
     main()

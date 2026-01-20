@@ -480,7 +480,7 @@ def mine_seeds_parallel(
 
 def main():
     OUT_FILE = "klondike_medium_seeds.json"
-    TARGET_COUNT = 200  # how many seeds you want
+    TARGET_COUNT = 2000  # how many seeds you want
 
     mine_seeds_parallel(
         outfile=OUT_FILE,

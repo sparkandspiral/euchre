@@ -47,6 +47,7 @@ class CardScaffold extends HookConsumerWidget {
   final DailyChallengeConfig? dailyChallenge;
   final Duration initialElapsed;
   final bool disableAds;
+  final Map<String, GlobalKey>? hintTargetKeys;
 
   const CardScaffold({
     super.key,
@@ -64,6 +65,7 @@ class CardScaffold extends HookConsumerWidget {
     this.dailyChallenge,
     this.initialElapsed = Duration.zero,
     this.disableAds = false,
+    this.hintTargetKeys,
   });
 
   @override
@@ -71,6 +73,11 @@ class CardScaffold extends HookConsumerWidget {
     final cardGameContext = context.watch<CardGameContext?>();
     final isPreview = cardGameContext?.isPreview ?? false;
     final isNoMovesSheetOpen = useRef(false);
+    final overlayKey = useMemoized(() => GlobalKey());
+
+    final activeHint = useState<HintSuggestion?>(null);
+    final hintTimer = useRef<Timer?>(null);
+    final lastHintSignature = useRef<String?>(null);
 
     final isHintProcessing = useState(false);
     final startTimeState =
@@ -79,6 +86,55 @@ class CardScaffold extends HookConsumerWidget {
 
     final saveState = ref.watch(saveStateNotifierProvider).valueOrNull;
     final difficultyGameState = saveState?.gameStates[game]?.states[difficulty];
+    final tutorialPrompted = useRef(false);
+
+    Future<void> maybePromptTutorial() async {
+      if (tutorialPrompted.value || isPreview || saveState == null) {
+        return;
+      }
+
+      final alreadyAsked = saveState.tutorialPromptsSeen[game] == true;
+      if (alreadyAsked) {
+        tutorialPrompted.value = true;
+        return;
+      }
+
+      final result = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('Do you know how to play ${game.title}?'),
+          content: const Text(
+            'If not, we can start with a quick walkthrough before your first game.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('I know it'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Teach me'),
+            ),
+          ],
+        ),
+      );
+
+      tutorialPrompted.value = true;
+      await ref.read(saveStateNotifierProvider.notifier).markTutorialPromptSeen(game);
+      if (!context.mounted) return;
+
+      if (result == true) {
+        await Future.delayed(const Duration(milliseconds: 200));
+        if (!context.mounted) return;
+        onTutorial();
+      }
+    }
+
+    useEffect(() {
+      Future.microtask(maybePromptTutorial);
+      return null;
+    }, [saveState, isPreview]);
 
     useEffect(() {
       if (isVictory) {
@@ -267,6 +323,13 @@ class CardScaffold extends HookConsumerWidget {
       return result ?? false;
     }
 
+    String? signatureFor(HintSuggestion hint) {
+      final from = hint.fromTarget;
+      final to = hint.toTarget;
+      if (from == null || to == null) return null;
+      return '$from->$to';
+    }
+
     Future<void> handleHintPressed() async {
       if (onHint == null || isPreview || isVictory || isHintProcessing.value) {
         return;
@@ -322,6 +385,22 @@ class CardScaffold extends HookConsumerWidget {
           return;
         }
 
+        final signature = signatureFor(hint);
+        if (signature != null && lastHintSignature.value != null) {
+          final reverse =
+              '${hint.toTarget ?? ''}->${hint.fromTarget ?? ''}';
+          if (lastHintSignature.value == reverse) {
+            if (!context.mounted) return;
+            messenger?.showSnackBar(
+              const SnackBar(
+                content: Text('No useful hint there. Try a different move.'),
+                duration: Duration(milliseconds: 1400),
+              ),
+            );
+            return;
+          }
+        }
+
         final didSpendHint =
             await ref.read(saveStateNotifierProvider.notifier).spendHint();
         if (!didSpendHint) {
@@ -333,9 +412,15 @@ class CardScaffold extends HookConsumerWidget {
         }
 
         if (!context.mounted) return;
-        final detail = hint.detail;
-        final text = detail == null ? hint.message : '${hint.message}\n$detail';
-        messenger?.showSnackBar(SnackBar(content: Text(text)));
+        lastHintSignature.value = signature ?? lastHintSignature.value;
+
+        if (hintTargetKeys != null && hintTargetKeys!.isNotEmpty) {
+          hintTimer.value?.cancel();
+          activeHint.value = hint;
+          hintTimer.value = Timer(hint.displayDuration, () {
+            activeHint.value = null;
+          });
+        }
       } finally {
         isHintProcessing.value = false;
       }
@@ -399,6 +484,7 @@ class CardScaffold extends HookConsumerWidget {
     }
 
     return Stack(
+      key: overlayKey,
       children: [
         LayoutBuilder(
           builder: (context, constraints) {
@@ -570,6 +656,14 @@ class CardScaffold extends HookConsumerWidget {
             );
           },
         ),
+        if (activeHint.value != null &&
+            hintTargetKeys != null &&
+            hintTargetKeys!.isNotEmpty)
+          _HintOverlay(
+            overlayKey: overlayKey,
+            hint: activeHint.value!,
+            targets: hintTargetKeys!,
+          ),
         AnimatedOpacity(
           duration: Duration(milliseconds: 500),
           curve: Curves.easeInOutCubic,
@@ -779,6 +873,127 @@ class _InGameMenuSheet extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _HintOverlay extends StatelessWidget {
+  final GlobalKey overlayKey;
+  final HintSuggestion hint;
+  final Map<String, GlobalKey> targets;
+
+  const _HintOverlay({
+    required this.overlayKey,
+    required this.hint,
+    required this.targets,
+  });
+
+  Rect? _rectFor(String? id) {
+    if (id == null) return null;
+    final overlayRender =
+        overlayKey.currentContext?.findRenderObject() as RenderBox?;
+    final targetRender =
+        targets[id]?.currentContext?.findRenderObject() as RenderBox?;
+
+    if (overlayRender == null ||
+        targetRender == null ||
+        !overlayRender.hasSize ||
+        !targetRender.hasSize) {
+      return null;
+    }
+
+    final targetTopLeft =
+        targetRender.localToGlobal(Offset.zero, ancestor: overlayRender);
+    return targetTopLeft & targetRender.size;
+  }
+
+  Widget _highlight(Rect rect, {bool accent = false}) {
+    return Positioned(
+      left: rect.left - 4,
+      top: rect.top - 4,
+      width: rect.width + 8,
+      height: rect.height + 8,
+      child: IgnorePointer(
+        child: Container(
+          decoration: BoxDecoration(
+            color: (accent ? Colors.lightBlueAccent : Colors.white)
+                .withValues(alpha: accent ? 0.25 : 0.15),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: accent
+                  ? Colors.lightBlueAccent
+                  : Colors.white.withValues(alpha: 0.8),
+              width: accent ? 3 : 2,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fromRect = _rectFor(hint.fromTarget);
+    final toRect = _rectFor(hint.toTarget);
+    final highlightRects =
+        hint.highlightTargets.map(_rectFor).whereType<Rect>().toList();
+
+    if (fromRect == null && toRect == null && highlightRects.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final ghostStart = fromRect?.center ?? toRect?.center;
+    final ghostEnd = toRect?.center ?? fromRect?.center ?? ghostStart;
+
+    return IgnorePointer(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: Duration(milliseconds: 600),
+        key: ValueKey(hint),
+        builder: (context, t, _) {
+          final curved = Curves.easeInOutCubic.transform(t);
+          final ghostPosition = (ghostStart != null && ghostEnd != null)
+              ? Offset.lerp(ghostStart, ghostEnd, curved)
+              : ghostStart ?? ghostEnd;
+
+          return Stack(
+            children: [
+              for (final rect in highlightRects) _highlight(rect),
+              if (fromRect != null) _highlight(fromRect),
+              if (toRect != null) _highlight(toRect, accent: true),
+              if (ghostPosition != null)
+                Positioned(
+                  left: ghostPosition.dx - 24,
+                  top: ghostPosition.dy - 32 + sin(pi * t) * -6,
+                  child: Opacity(
+                    opacity: 0.9,
+                    child: Container(
+                      width: 48,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(12),
+                        border:
+                            Border.all(color: Colors.lightBlueAccent, width: 2),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 10,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.swipe_right,
+                        color: Colors.lightBlueAccent,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }

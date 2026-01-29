@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'dart:async';
 
 import 'package:card_game/card_game.dart';
@@ -21,6 +19,7 @@ import 'package:solitaire/utils/constraints_extensions.dart';
 import 'package:solitaire/providers/save_state_notifier.dart';
 import 'package:solitaire/utils/card_description.dart';
 import 'package:solitaire/utils/suited_card_codec.dart';
+import 'package:solitaire/utils/shuffle.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
 import 'package:utils/utils.dart';
@@ -49,8 +48,12 @@ class GolfSolitaireState {
     required bool canRollover,
     int? shuffleSeed,
   }) {
-    final random = shuffleSeed == null ? Random() : Random(shuffleSeed);
-    var deck = List.of(SuitedCard.deck)..shuffle(random);
+    var deck = List.of(SuitedCard.deck);
+    if (shuffleSeed == null) {
+      deck.shuffle();
+    } else {
+      shuffleWithSeed(deck, shuffleSeed);
+    }
 
     final cards = List.generate(7, (i) {
       final column = deck.take(5).toList();
@@ -150,6 +153,9 @@ class GolfSolitaireState {
             : 'onto $foundationDescription';
         return HintSuggestion(
           message: 'Play ${describeCard(card)} from $source $target.',
+          fromTarget: 'tableau-$column',
+          toTarget: 'foundation',
+          highlightTargets: ['tableau-$column', 'foundation'],
         );
       }
     }
@@ -157,6 +163,9 @@ class GolfSolitaireState {
     if (canDraw) {
       return const HintSuggestion(
         message: 'Draw a new card to refresh the foundation.',
+        fromTarget: 'draw',
+        toTarget: 'foundation',
+        highlightTargets: ['draw', 'foundation'],
       );
     }
 
@@ -239,6 +248,8 @@ class GolfSolitaire extends HookConsumerWidget {
     final tableauKey = useMemoized(() => GlobalKey());
     final foundationKey = useMemoized(() => GlobalKey());
     final drawPileKey = useMemoized(() => GlobalKey());
+    final tableauColumnKeys =
+        useMemoized(() => List.generate(state.value.cards.length, (_) => GlobalKey()));
 
     void startTutorial() {
       showGameTutorial(
@@ -289,6 +300,12 @@ class GolfSolitaire extends HookConsumerWidget {
       dailyChallenge: dailyChallenge,
       initialElapsed:
           Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      hintTargetKeys: {
+        'draw': drawPileKey,
+        'foundation': foundationKey,
+        for (var i = 0; i < tableauColumnKeys.length; i++)
+          'tableau-$i': tableauColumnKeys[i],
+      },
       onNewGame: () {
         if (dailyChallenge == null) {
           unawaited(clearSnapshot());
@@ -345,6 +362,7 @@ class GolfSolitaire extends HookConsumerWidget {
                     children: state.value.cards
                         .mapIndexed((i, column) =>
                             CardLinearGroup<SuitedCard, dynamic>(
+                              key: tableauColumnKeys[i],
                               cardOffset: axis.inverted.offset * cardOffset,
                               value: i,
                               values: column,

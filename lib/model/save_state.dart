@@ -47,6 +47,9 @@ class SaveState {
   final Map<Game, DailyChallengeProgress> dailyChallengeProgress;
 
   @JsonKey(defaultValue: {})
+  final Map<Game, bool> tutorialPromptsSeen;
+
+  @JsonKey(defaultValue: {})
   final Map<Game, ActiveGameSnapshot> activeGames;
 
   @JsonKey(defaultValue: false)
@@ -67,6 +70,7 @@ class SaveState {
     required this.enableAutoMove,
     required this.hints,
     required this.dailyChallengeProgress,
+    required this.tutorialPromptsSeen,
     required this.activeGames,
     required this.adsRemoved,
     required this.unlimitedHints,
@@ -84,6 +88,7 @@ class SaveState {
         enableAutoMove = true,
         hints = defaultHintCount,
         dailyChallengeProgress = const {},
+        tutorialPromptsSeen = const {},
         activeGames = const {},
         adsRemoved = false,
         unlimitedHints = false;
@@ -176,6 +181,13 @@ class SaveState {
         },
       );
 
+  SaveState withTutorialPromptSeen(Game game) => copyWith(
+        tutorialPromptsSeen: {
+          ...tutorialPromptsSeen,
+          game: true,
+        },
+      );
+
   SaveState withoutActiveGame(Game game) => copyWith(
         activeGames: {...activeGames}..remove(game),
       );
@@ -234,6 +246,7 @@ class SaveState {
     bool? enableAutoMove,
     int? hints,
     Map<Game, DailyChallengeProgress>? dailyChallengeProgress,
+    Map<Game, bool>? tutorialPromptsSeen,
     Map<Game, ActiveGameSnapshot>? activeGames,
     bool? adsRemoved,
     bool? unlimitedHints,
@@ -252,6 +265,7 @@ class SaveState {
       hints: hints ?? this.hints,
       dailyChallengeProgress:
           dailyChallengeProgress ?? this.dailyChallengeProgress,
+      tutorialPromptsSeen: tutorialPromptsSeen ?? this.tutorialPromptsSeen,
       activeGames: activeGames ?? this.activeGames,
       adsRemoved: adsRemoved ?? this.adsRemoved,
       unlimitedHints: unlimitedHints ?? this.unlimitedHints,

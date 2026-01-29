@@ -89,7 +89,7 @@ class HomePage extends ConsumerWidget {
                 ),
       };
 
-  void _startGame({
+  Future<void> _startGame({
     required BuildContext context,
     required WidgetRef ref,
     required Game game,
@@ -97,12 +97,13 @@ class HomePage extends ConsumerWidget {
     required Difficulty difficulty,
     DailyChallengeConfig? dailyChallenge,
     ActiveGameSnapshot? snapshot,
-  }) {
+  }) async {
+    const startWithTutorial = false;
     context.pushReplacement(
       () => GameView(
         cardGame: builder(
           difficulty,
-          false,
+          startWithTutorial,
           dailyChallenge: dailyChallenge,
           snapshot: snapshot,
         ),
@@ -114,14 +115,14 @@ class HomePage extends ConsumerWidget {
         );
   }
 
-  void _startDailyGame({
+  Future<void> _startDailyGame({
     required BuildContext context,
     required WidgetRef ref,
     required Game game,
     required GameWidgetBuilder builder,
     required DailyChallengeConfig config,
-  }) {
-    _startGame(
+  }) async {
+    await _startGame(
       context: context,
       ref: ref,
       game: game,
@@ -132,7 +133,7 @@ class HomePage extends ConsumerWidget {
     );
   }
 
-  void _showDifficultySelector({
+  Future<void> _showDifficultySelector({
     required BuildContext rootContext,
     required WidgetRef ref,
     required Game game,
@@ -140,8 +141,8 @@ class HomePage extends ConsumerWidget {
     required Difficulty currentDefault,
     required DailyChallengeConfig dailyConfig,
     required bool dailyCompleted,
-  }) {
-    showModalBottomSheet(
+  }) async {
+    await showModalBottomSheet(
       context: rootContext,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -151,9 +152,9 @@ class HomePage extends ConsumerWidget {
           defaultDifficulty: currentDefault,
           dailyConfig: dailyConfig,
           dailyCompleted: dailyCompleted,
-          onDailySelected: () {
+          onDailySelected: () async {
             Navigator.of(sheetContext).pop();
-            _startDailyGame(
+            await _startDailyGame(
               context: rootContext,
               ref: ref,
               game: game,
@@ -161,9 +162,9 @@ class HomePage extends ConsumerWidget {
               config: dailyConfig,
             );
           },
-          onDifficultyChosen: (difficulty) {
+          onDifficultyChosen: (difficulty) async {
             Navigator.of(sheetContext).pop();
-            _startGame(
+            await _startGame(
               context: rootContext,
               ref: ref,
               game: game,
@@ -316,7 +317,7 @@ class HomePage extends ConsumerWidget {
     }
 
     if (!context.mounted) return;
-    _showDifficultySelector(
+    await _showDifficultySelector(
       rootContext: context,
       ref: ref,
       game: game,
@@ -476,10 +477,10 @@ class _GameCard extends StatelessWidget {
 class _DifficultySheet extends StatelessWidget {
   final Game game;
   final Difficulty defaultDifficulty;
-  final ValueChanged<Difficulty> onDifficultyChosen;
+  final Future<void> Function(Difficulty) onDifficultyChosen;
   final DailyChallengeConfig dailyConfig;
   final bool dailyCompleted;
-  final VoidCallback onDailySelected;
+  final Future<void> Function() onDailySelected;
 
   const _DifficultySheet({
     required this.game,
@@ -501,7 +502,7 @@ class _DifficultySheet extends StatelessWidget {
                 icon: difficulty.icon,
                 title: difficulty.title,
                 description: difficulty.getDescription(game),
-                onTap: () => onDifficultyChosen(difficulty),
+                onTap: () async => onDifficultyChosen(difficulty),
                 highlight: false,
               ),
             )
@@ -514,7 +515,7 @@ class _DifficultySheet extends StatelessWidget {
               description: dailyCompleted
                   ? 'You finished today\'s puzzle!'
                   : 'Play today\'s puzzle and compete on the leaderboard.',
-              onTap: onDailySelected,
+              onTap: () async => onDailySelected(),
               highlight: !dailyCompleted,
               highlightColor: Colors.lightBlueAccent,
               trailing: dailyCompleted

@@ -19,6 +19,7 @@ import 'package:solitaire/styles/playing_card_builder.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
 import 'package:solitaire/utils/card_description.dart';
 import 'package:solitaire/utils/suited_card_codec.dart';
+import 'package:solitaire/utils/shuffle.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
 import 'package:utils/utils.dart';
@@ -77,8 +78,12 @@ class PyramidSolitaireState {
     required bool startWithWasteCard,
     int? shuffleSeed,
   }) {
-    final random = shuffleSeed == null ? Random() : Random(shuffleSeed);
-    var suitedDeck = List.of(SuitedCard.deck)..shuffle(random);
+    var suitedDeck = List.of(SuitedCard.deck);
+    if (shuffleSeed == null) {
+      suitedDeck.shuffle();
+    } else {
+      shuffleWithSeed(suitedDeck, shuffleSeed);
+    }
 
     // Optionally bury Aces at bottom of stock to increase difficulty similar to Ace mode patterns
     if (buryAces) {
@@ -261,14 +266,7 @@ class PyramidSolitaireState {
   }
 
   HintSuggestion? findHint() {
-    final exposedPositions = <PyramidCardPos>[];
-    for (var row = 0; row < pyramid.length; row++) {
-      for (var col = 0; col < pyramid[row].length; col++) {
-        if (isExposed(row, col)) {
-          exposedPositions.add(PyramidCardPos(row, col));
-        }
-      }
-    }
+    final exposedPositions = getExposedPositions();
 
     for (final pos in exposedPositions) {
       final card = pyramid[pos.row][pos.col];
@@ -277,6 +275,8 @@ class PyramidSolitaireState {
         return HintSuggestion(
           message:
               'Remove the king ${describeCard(card.card)} at ${describeRowPosition(pos.row, pos.col)}.',
+          fromTarget: 'pyramid',
+          highlightTargets: ['pyramid'],
         );
       }
     }
@@ -292,6 +292,9 @@ class PyramidSolitaireState {
           return HintSuggestion(
             message:
                 'Pair ${describeCard(cardA.card)} at ${describeRowPosition(aPos.row, aPos.col)} with ${describeCard(cardB.card)} at ${describeRowPosition(bPos.row, bPos.col)}.',
+            fromTarget: 'pyramid',
+            toTarget: 'pyramid',
+            highlightTargets: ['pyramid'],
           );
         }
       }
@@ -306,6 +309,9 @@ class PyramidSolitaireState {
           return HintSuggestion(
             message:
                 'Match ${describeCard(pyramidCard.card)} at ${describeRowPosition(pos.row, pos.col)} with the waste card ${describeCard(wasteCard.card)}.',
+            fromTarget: 'pyramid',
+            toTarget: 'waste',
+            highlightTargets: ['pyramid', 'waste'],
           );
         }
       }
@@ -314,6 +320,8 @@ class PyramidSolitaireState {
     if (canDraw) {
       return const HintSuggestion(
         message: 'Draw a new waste card from the stock.',
+        fromTarget: 'stock',
+        highlightTargets: ['stock'],
       );
     }
 
@@ -482,6 +490,11 @@ class PyramidSolitaire extends HookConsumerWidget {
       dailyChallenge: dailyChallenge,
       initialElapsed:
           Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      hintTargetKeys: {
+        'pyramid': pyramidKey,
+        'stock': stockKey,
+        'waste': wasteKey,
+      },
       onNewGame: () {
         if (dailyChallenge == null) {
           unawaited(clearSnapshot());

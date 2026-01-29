@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'dart:async';
 
 import 'package:card_game/card_game.dart';
@@ -24,6 +22,7 @@ import 'package:solitaire/utils/constraints_extensions.dart';
 import 'package:solitaire/providers/save_state_notifier.dart';
 import 'package:solitaire/utils/card_description.dart';
 import 'package:solitaire/utils/suited_card_codec.dart';
+import 'package:solitaire/utils/shuffle.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
 import 'package:utils/utils.dart';
@@ -118,8 +117,11 @@ class SpiderSolitaireState {
       }
     }
 
-    final random = shuffleSeed == null ? Random() : Random(shuffleSeed);
-    deck.shuffle(random);
+    if (shuffleSeed == null) {
+      deck.shuffle();
+    } else {
+      shuffleWithSeed(deck, shuffleSeed);
+    }
 
     // Deal initial tableau: first 4 columns get 6 cards, last 6 get 5 cards
     final hiddenCards = <List<SpiderCard>>[];
@@ -392,6 +394,9 @@ class SpiderSolitaireState {
             message:
                 'Move $cardsDescription from ${describeColumn(column)} onto $targetDescription.',
             detail: detailParts.isEmpty ? null : detailParts.join(' '),
+            fromTarget: 'tableau-$column',
+            toTarget: 'tableau-$target',
+            highlightTargets: ['tableau-$column', 'tableau-$target'],
           );
 
           final score =
@@ -414,12 +419,15 @@ class SpiderSolitaireState {
     if (canDeal) {
       return const HintSuggestion(
         message: 'Deal one card to each column from the stock.',
+        fromTarget: 'stock',
+        highlightTargets: ['stock'],
       );
     }
 
     if (stock.isNotEmpty && revealedCards.any((column) => column.isEmpty)) {
       return const HintSuggestion(
         message: 'Fill every column before dealing from the stock.',
+        highlightTargets: ['stock'],
       );
     }
 
@@ -536,6 +544,8 @@ class SpiderSolitaire extends HookConsumerWidget {
     final tableauKey = useMemoized(() => GlobalKey());
     final stockKey = useMemoized(() => GlobalKey());
     final completedKey = useMemoized(() => GlobalKey());
+    final tableauGroupKeys =
+        useMemoized(() => List.generate(10, (_) => GlobalKey()));
 
     void startTutorial() {
       showGameTutorial(
@@ -587,6 +597,11 @@ class SpiderSolitaire extends HookConsumerWidget {
       dailyChallenge: dailyChallenge,
       initialElapsed:
           Duration(milliseconds: snapshot?.elapsedMilliseconds ?? 0),
+      hintTargetKeys: {
+        'stock': stockKey,
+        for (var i = 0; i < tableauGroupKeys.length; i++)
+          'tableau-$i': tableauGroupKeys[i],
+      },
       onNewGame: () {
         if (dailyChallenge == null) {
           unawaited(clearSnapshot());
@@ -764,6 +779,7 @@ class SpiderSolitaire extends HookConsumerWidget {
                           hiddenSpiderCards + revealedSpiderCards;
 
                       return CardLinearGroup<SpiderCard, dynamic>(
+                        key: tableauGroupKeys[i],
                         value: i,
                         cardOffset: axis.inverted.offset * cardOffset,
                         maxGrabStackSize: null,

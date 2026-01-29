@@ -38,6 +38,11 @@ SaveState _$SaveStateFromJson(Map<String, dynamic> json) => SaveState(
                     DailyChallengeProgress.fromJson(e as Map<String, dynamic>)),
               ) ??
               {},
+      tutorialPromptsSeen:
+          (json['tutorialPromptsSeen'] as Map<String, dynamic>?)?.map(
+                (k, e) => MapEntry($enumDecode(_$GameEnumMap, k), e as bool),
+              ) ??
+              {},
       activeGames: (json['activeGames'] as Map<String, dynamic>?)?.map(
             (k, e) => MapEntry($enumDecode(_$GameEnumMap, k),
                 ActiveGameSnapshot.fromJson(e as Map<String, dynamic>)),
@@ -62,6 +67,8 @@ Map<String, dynamic> _$SaveStateToJson(SaveState instance) => <String, dynamic>{
       'enableAutoMove': instance.enableAutoMove,
       'hints': instance.hints,
       'dailyChallengeProgress': instance.dailyChallengeProgress
+          .map((k, e) => MapEntry(_$GameEnumMap[k]!, e)),
+      'tutorialPromptsSeen': instance.tutorialPromptsSeen
           .map((k, e) => MapEntry(_$GameEnumMap[k]!, e)),
       'activeGames':
           instance.activeGames.map((k, e) => MapEntry(_$GameEnumMap[k]!, e)),

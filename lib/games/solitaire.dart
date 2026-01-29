@@ -22,6 +22,7 @@ import 'package:solitaire/utils/axis_extensions.dart';
 import 'package:solitaire/utils/constraints_extensions.dart';
 import 'package:solitaire/utils/card_description.dart';
 import 'package:solitaire/utils/suited_card_codec.dart';
+import 'package:solitaire/utils/shuffle.dart';
 import 'package:solitaire/widgets/card_scaffold.dart';
 import 'package:solitaire/widgets/delayed_auto_move_listener.dart';
 import 'package:solitaire/widgets/game_tutorial.dart';
@@ -60,8 +61,12 @@ class SolitaireState {
     required bool acesAtBottom,
     int? shuffleSeed,
   }) {
-    final random = shuffleSeed == null ? Random() : Random(shuffleSeed);
-    var deck = List.of(SuitedCard.deck)..shuffle(random);
+    var deck = List.of(SuitedCard.deck);
+    if (shuffleSeed == null) {
+      deck.shuffle();
+    } else {
+      shuffleWithSeed(deck, shuffleSeed);
+    }
 
     final aces =
         deck.where((card) => card.value == AceSuitedCardValue()).toList();
@@ -312,17 +317,16 @@ class SolitaireState {
   }
 
   HintSuggestion? findHint() {
-    HintSuggestion describeFoundationMove(int column, SuitedCard card) {
-      return HintSuggestion(
-        message:
-            'Move ${describeCard(card)} from ${describeColumn(column)} to the ${describeSuitName(card.suit)} foundation.',
-      );
-    }
-
     for (int column = 0; column < revealedCards.length; column++) {
       final card = revealedCards[column].lastOrNull;
       if (card != null && canComplete(card)) {
-        return describeFoundationMove(column, card);
+        return HintSuggestion(
+          message:
+              'Move ${describeCard(card)} from ${describeColumn(column)} to the ${describeSuitName(card.suit)} foundation.',
+          fromTarget: 'tableau-$column',
+          toTarget: 'foundation',
+          highlightTargets: ['tableau-$column', 'foundation'],
+        );
       }
     }
 
@@ -331,6 +335,9 @@ class SolitaireState {
       return HintSuggestion(
         message:
             'Move ${describeCard(wasteCard)} from the waste pile to the ${describeSuitName(wasteCard.suit)} foundation.',
+        fromTarget: 'waste',
+        toTarget: 'foundation',
+        highlightTargets: ['waste', 'foundation'],
       );
     }
 
@@ -344,6 +351,9 @@ class SolitaireState {
           return HintSuggestion(
             message:
                 'Play ${describeCard(wasteCard)} from the waste pile onto $targetDescription.',
+            fromTarget: 'waste',
+            toTarget: 'tableau-$column',
+            highlightTargets: ['waste', 'tableau-$column'],
           );
         }
       }
@@ -376,6 +386,9 @@ class SolitaireState {
             message:
                 'Move ${describeCardSequence(moving)} from ${describeColumn(from)} onto $targetDescription.',
             detail: revealsHidden ? 'This move reveals a hidden card.' : null,
+            fromTarget: 'tableau-$from',
+            toTarget: 'tableau-$target',
+            highlightTargets: ['tableau-$from', 'tableau-$target'],
           );
 
           if (revealsHidden) {
@@ -397,12 +410,17 @@ class SolitaireState {
     if (deck.isNotEmpty) {
       return const HintSuggestion(
         message: 'Tap the draw pile to reveal more cards.',
+        fromTarget: 'draw',
+        highlightTargets: ['draw'],
       );
     }
 
     if (deck.isEmpty && revealedDeck.isNotEmpty) {
       return const HintSuggestion(
         message: 'Recycle the waste pile to keep the game going.',
+        fromTarget: 'waste',
+        toTarget: 'draw',
+        highlightTargets: ['waste', 'draw'],
       );
     }
 
@@ -619,6 +637,8 @@ class Solitaire extends HookConsumerWidget {
     final foundationKey = useMemoized(() => GlobalKey());
     final drawPileKey = useMemoized(() => GlobalKey());
     final wastePileKey = useMemoized(() => GlobalKey());
+    final tableauColumnKeys =
+        useMemoized(() => List.generate(7, (_) => GlobalKey()));
 
     void startTutorial() {
       showGameTutorial(
@@ -676,6 +696,13 @@ class Solitaire extends HookConsumerWidget {
       difficulty: difficulty,
       dailyChallenge: dailyChallenge,
       initialElapsed: initialElapsed,
+      hintTargetKeys: {
+        'draw': drawPileKey,
+        'waste': wastePileKey,
+        'foundation': foundationKey,
+        for (var i = 0; i < tableauColumnKeys.length; i++)
+          'tableau-$i': tableauColumnKeys[i],
+      },
       onNewGame: () {
         if (dailyChallenge == null) {
           unawaited(clearSnapshot());
@@ -810,6 +837,7 @@ class Solitaire extends HookConsumerWidget {
                           final revealedCards = state.value.revealedCards[i];
 
                           return CardLinearGroup<SuitedCard, dynamic>(
+                            key: tableauColumnKeys[i],
                             value: i,
                             cardOffset: axis.inverted.offset * cardOffset,
                             maxGrabStackSize: null,

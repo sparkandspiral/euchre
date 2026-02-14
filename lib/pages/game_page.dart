@@ -5,6 +5,9 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:euchre/model/bot_difficulty.dart';
 import 'package:euchre/model/euchre_game_state.dart';
 import 'package:euchre/model/game_phase.dart';
+import 'package:card_game/card_game.dart';
+import 'package:euchre/logic/card_ranking.dart';
+import 'package:euchre/model/euchre_round_state.dart';
 import 'package:euchre/model/player.dart';
 import 'package:euchre/providers/save_state_notifier.dart';
 import 'package:euchre/services/audio_service.dart';
@@ -198,35 +201,140 @@ class _BottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final round = state.currentRound;
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
-            icon: Icon(Icons.menu, color: Colors.white70),
-            onPressed: onMenu,
+          // Status row: led suit, last trick winner, bid passes
+          if (round != null) _StatusRow(round: round),
+          // Main bottom row
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(Icons.menu, color: Colors.white70),
+                onPressed: onMenu,
+                visualDensity: VisualDensity.compact,
+              ),
+              Spacer(),
+              if (round != null) ...[
+                Text('Round ${state.roundNumber}',
+                    style: TextStyle(color: Colors.white54, fontSize: 13)),
+                SizedBox(width: 16),
+                if (round.trumpSuit != null)
+                  Text(
+                    'Tricks: ${round.tricksWon[Team.playerTeam] ?? 0} - ${round.tricksWon[Team.opponentTeam] ?? 0}',
+                    style: TextStyle(color: Colors.white54, fontSize: 13),
+                  ),
+                SizedBox(width: 16),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text('D: ${round.dealer.displayName}',
+                      style: TextStyle(color: Colors.white54, fontSize: 12)),
+                ),
+              ],
+            ],
           ),
-          Spacer(),
-          if (round != null) ...[
-            Text('Round ${state.roundNumber}',
-                style: TextStyle(color: Colors.white54, fontSize: 13)),
-            SizedBox(width: 16),
-            if (round.trumpSuit != null)
-              Text(
-                'Tricks: ${round.tricksWon[Team.playerTeam] ?? 0}',
-                style: TextStyle(color: Colors.white54, fontSize: 13),
-              ),
-            SizedBox(width: 16),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text('D: ${round.dealer.displayName}',
-                  style: TextStyle(color: Colors.white54, fontSize: 12)),
-            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusRow extends StatelessWidget {
+  final EuchreRoundState round;
+  const _StatusRow({required this.round});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = <Widget>[];
+
+    // During bidding: show who has passed
+    if (round.phase.isBidding && round.passedPlayers.isNotEmpty) {
+      final passedNames = round.passedPlayers
+          .map((p) => p.displayName)
+          .join(', ');
+      items.add(_StatusChip(
+        label: 'Passed: $passedNames',
+        color: Colors.white54,
+      ));
+    }
+
+    // During play: show led suit
+    if (round.phase == GamePhase.playing && round.trumpSuit != null) {
+      final trick = round.currentTrick;
+      if (trick != null && trick.plays.isNotEmpty) {
+        final ledSuit = CardRanking.effectiveSuit(
+            trick.plays.first.card, round.trumpSuit!);
+        items.add(_StatusChip(
+          label: 'Led: ${_suitSymbol(ledSuit)}',
+          color: _suitColor(ledSuit),
+        ));
+      }
+    }
+
+    // Show last trick winner
+    if (round.completedTricks.isNotEmpty && round.trumpSuit != null) {
+      final lastTrick = round.completedTricks.last;
+      final winner = lastTrick.winner(round.trumpSuit!);
+      if (winner != null) {
+        items.add(_StatusChip(
+          label: 'Last trick: ${winner.displayName}',
+          color: winner.team == Team.playerTeam
+              ? Colors.green.shade300
+              : Colors.red.shade300,
+        ));
+      }
+    }
+
+    if (items.isEmpty) return SizedBox.shrink();
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (int i = 0; i < items.length; i++) ...[
+            if (i > 0) SizedBox(width: 8),
+            items[i],
           ],
         ],
+      ),
+    );
+  }
+
+  String _suitSymbol(CardSuit suit) => switch (suit) {
+        CardSuit.hearts => '\u2665 Hearts',
+        CardSuit.diamonds => '\u2666 Diamonds',
+        CardSuit.clubs => '\u2663 Clubs',
+        CardSuit.spades => '\u2660 Spades',
+      };
+
+  Color _suitColor(CardSuit suit) => switch (suit) {
+        CardSuit.hearts || CardSuit.diamonds => Colors.red.shade300,
+        CardSuit.clubs || CardSuit.spades => Colors.white70,
+      };
+}
+
+class _StatusChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _StatusChip({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontSize: 11),
       ),
     );
   }

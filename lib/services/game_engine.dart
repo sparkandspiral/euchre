@@ -203,7 +203,9 @@ class GameEngine {
 
   void _handlePass() {
     var round = _state.currentRound!;
+    final passer = round.currentPlayer;
     final nextPlayer = _nextActivePlayer(round.currentPlayer.next, round);
+    final newPassedPlayers = [...round.passedPlayers, passer];
 
     // Check if we've gone around the table
     if (round.phase == GamePhase.bidRound1) {
@@ -212,18 +214,28 @@ class GameEngine {
         round = round.copyWith(
           phase: GamePhase.bidRound2,
           currentPlayer: round.leftOfDealer,
+          passedPlayers: newPassedPlayers,
         );
       } else {
-        round = round.copyWith(currentPlayer: nextPlayer);
+        round = round.copyWith(
+          currentPlayer: nextPlayer,
+          passedPlayers: newPassedPlayers,
+        );
       }
     } else if (round.phase == GamePhase.bidRound2) {
       // Check if dealer must pick (stick the dealer)
       if (nextPlayer == round.leftOfDealer) {
         // Dealer was the last to pass - shouldn't happen with stick the dealer
         // Force dealer to pick
-        round = round.copyWith(currentPlayer: round.dealer);
+        round = round.copyWith(
+          currentPlayer: round.dealer,
+          passedPlayers: newPassedPlayers,
+        );
       } else {
-        round = round.copyWith(currentPlayer: nextPlayer);
+        round = round.copyWith(
+          currentPlayer: nextPlayer,
+          passedPlayers: newPassedPlayers,
+        );
       }
     }
 

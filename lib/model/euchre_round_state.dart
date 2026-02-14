@@ -18,6 +18,9 @@ class EuchreRoundState {
   final bool goAlone;
   final PlayerPosition? sittingOut;
 
+  // Bidding state tracking
+  final List<PlayerPosition> passedPlayers;
+
   // Trick play state
   final Trick? currentTrick;
   final List<Trick> completedTricks;
@@ -37,6 +40,7 @@ class EuchreRoundState {
     this.caller,
     this.goAlone = false,
     this.sittingOut,
+    this.passedPlayers = const [],
     this.currentTrick,
     this.completedTricks = const [],
     this.tricksWon = const {Team.playerTeam: 0, Team.opponentTeam: 0},
@@ -62,6 +66,7 @@ class EuchreRoundState {
     PlayerPosition? caller,
     bool? goAlone,
     PlayerPosition? sittingOut,
+    List<PlayerPosition>? passedPlayers,
     Trick? currentTrick,
     List<Trick>? completedTricks,
     Map<Team, int>? tricksWon,
@@ -78,6 +83,7 @@ class EuchreRoundState {
       caller: caller ?? this.caller,
       goAlone: goAlone ?? this.goAlone,
       sittingOut: sittingOut ?? this.sittingOut,
+      passedPlayers: passedPlayers ?? this.passedPlayers,
       currentTrick: currentTrick ?? this.currentTrick,
       completedTricks: completedTricks ?? this.completedTricks,
       tricksWon: tricksWon ?? this.tricksWon,

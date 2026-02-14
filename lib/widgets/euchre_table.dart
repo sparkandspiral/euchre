@@ -27,7 +27,7 @@ class EuchreTable extends StatelessWidget {
     return LayoutBuilder(builder: (context, constraints) {
       final isWide = constraints.maxWidth > constraints.maxHeight;
       final minDim = isWide ? constraints.maxHeight : constraints.maxWidth;
-      final sizeMultiplier = (minDim / 550).clamp(0.4, 1.2);
+      final sizeMultiplier = (minDim / 320).clamp(0.5, 1.2);
       final cardWidth = 69 * sizeMultiplier;
       final cardHeight = 93 * sizeMultiplier;
       final spacing = 4.0 * sizeMultiplier;
@@ -42,13 +42,17 @@ class EuchreTable extends StatelessWidget {
           children: [
             // North hand (partner, face down)
             SizedBox(height: spacing),
-            _BotHand(
-              cards: round.handFor(PlayerPosition.north),
-              cardWidth: cardWidth,
-              cardHeight: cardHeight,
-              cardBack: cardBack ?? CardBack.redStripes,
-              label: 'Partner',
+            _LabeledHand(
+              label: PlayerPosition.north.displayName,
               isCurrentPlayer: round.currentPlayer == PlayerPosition.north,
+              child: _BotHand(
+                cards: round.handFor(PlayerPosition.north),
+                cardWidth: cardWidth,
+                cardHeight: cardHeight,
+                cardBack: cardBack ?? CardBack.redStripes,
+                label: 'Partner',
+                isCurrentPlayer: round.currentPlayer == PlayerPosition.north,
+              ),
             ),
             SizedBox(height: spacing),
 
@@ -57,13 +61,17 @@ class EuchreTable extends StatelessWidget {
               child: Row(
                 children: [
                   // West hand (vertical, face down)
-                  _VerticalBotHand(
-                    cards: round.handFor(PlayerPosition.west),
-                    cardWidth: cardWidth,
-                    cardHeight: cardHeight,
-                    cardBack: cardBack ?? CardBack.redStripes,
-                    label: 'West',
+                  _LabeledVerticalHand(
+                    label: PlayerPosition.west.displayName,
                     isCurrentPlayer: round.currentPlayer == PlayerPosition.west,
+                    child: _VerticalBotHand(
+                      cards: round.handFor(PlayerPosition.west),
+                      cardWidth: cardWidth,
+                      cardHeight: cardHeight,
+                      cardBack: cardBack ?? CardBack.redStripes,
+                      label: 'West',
+                      isCurrentPlayer: round.currentPlayer == PlayerPosition.west,
+                    ),
                   ),
 
                   // Center trick area
@@ -78,13 +86,17 @@ class EuchreTable extends StatelessWidget {
                   ),
 
                   // East hand (vertical, face down)
-                  _VerticalBotHand(
-                    cards: round.handFor(PlayerPosition.east),
-                    cardWidth: cardWidth,
-                    cardHeight: cardHeight,
-                    cardBack: cardBack ?? CardBack.redStripes,
-                    label: 'East',
+                  _LabeledVerticalHand(
+                    label: PlayerPosition.east.displayName,
                     isCurrentPlayer: round.currentPlayer == PlayerPosition.east,
+                    child: _VerticalBotHand(
+                      cards: round.handFor(PlayerPosition.east),
+                      cardWidth: cardWidth,
+                      cardHeight: cardHeight,
+                      cardBack: cardBack ?? CardBack.redStripes,
+                      label: 'East',
+                      isCurrentPlayer: round.currentPlayer == PlayerPosition.east,
+                    ),
                   ),
                 ],
               ),
@@ -93,20 +105,24 @@ class EuchreTable extends StatelessWidget {
             SizedBox(height: spacing),
 
             // South hand (human, face up)
-            _HumanHand(
-              cards: round.handFor(PlayerPosition.south),
-              cardWidth: cardWidth,
-              cardHeight: cardHeight,
-              isActive: isHumanTurn,
-              trumpSuit: round.trumpSuit,
-              ledSuit: _effectiveLedSuit(),
-              onCardTap: (card) {
-                if (round.phase == GamePhase.dealerDiscard) {
-                  engine.humanDiscard(card);
-                } else if (round.phase == GamePhase.playing) {
-                  engine.humanPlayCard(card);
-                }
-              },
+            _LabeledHand(
+              label: PlayerPosition.south.displayName,
+              isCurrentPlayer: round.currentPlayer == PlayerPosition.south,
+              child: _HumanHand(
+                cards: round.handFor(PlayerPosition.south),
+                cardWidth: cardWidth,
+                cardHeight: cardHeight,
+                isActive: isHumanTurn,
+                trumpSuit: round.trumpSuit,
+                ledSuit: _effectiveLedSuit(),
+                onCardTap: (card) {
+                  if (round.phase == GamePhase.dealerDiscard) {
+                    engine.humanDiscard(card);
+                  } else if (round.phase == GamePhase.playing) {
+                    engine.humanPlayCard(card);
+                  }
+                },
+              ),
             ),
             SizedBox(height: spacing * 2),
           ],
@@ -155,7 +171,7 @@ class _HumanHand extends StatelessWidget {
           )
         : <SuitedCard>[];
 
-    final overlap = (cardWidth * 0.45).clamp(20.0, 40.0);
+    final overlap = (cardWidth * 0.45).clamp(20.0, 55.0);
     final totalWidth = cardWidth + (cards.length - 1) * overlap;
 
     return SizedBox(
@@ -255,8 +271,8 @@ class _BotHand extends StatelessWidget {
   Widget build(BuildContext context) {
     if (cards.isEmpty) return SizedBox(height: cardHeight * 0.5);
 
-    final smallWidth = cardWidth * 0.65;
-    final smallHeight = cardHeight * 0.65;
+    final smallWidth = cardWidth * 0.85;
+    final smallHeight = cardHeight * 0.85;
     final overlap = smallWidth * 0.4;
     final totalWidth = smallWidth + (cards.length - 1) * overlap;
 
@@ -325,8 +341,8 @@ class _VerticalBotHand extends StatelessWidget {
   Widget build(BuildContext context) {
     if (cards.isEmpty) return SizedBox(width: cardWidth * 0.5);
 
-    final smallWidth = cardWidth * 0.55;
-    final smallHeight = cardHeight * 0.55;
+    final smallWidth = cardWidth * 0.75;
+    final smallHeight = cardHeight * 0.75;
     final overlap = smallHeight * 0.35;
     final totalHeight = smallHeight + (cards.length - 1) * overlap;
 
@@ -367,6 +383,69 @@ class _VerticalBotHand extends StatelessWidget {
                   ),
                 ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LabeledHand extends StatelessWidget {
+  final String label;
+  final bool isCurrentPlayer;
+  final Widget child;
+
+  const _LabeledHand({
+    required this.label,
+    required this.isCurrentPlayer,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        child,
+        SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            color: isCurrentPlayer ? Colors.amber : Colors.white54,
+            fontSize: 11,
+            fontWeight: isCurrentPlayer ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LabeledVerticalHand extends StatelessWidget {
+  final String label;
+  final bool isCurrentPlayer;
+  final Widget child;
+
+  const _LabeledVerticalHand({
+    required this.label,
+    required this.isCurrentPlayer,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        child,
+        SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: isCurrentPlayer ? Colors.amber : Colors.white54,
+            fontSize: 11,
+            fontWeight: isCurrentPlayer ? FontWeight.bold : FontWeight.normal,
           ),
         ),
       ],

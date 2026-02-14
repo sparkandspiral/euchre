@@ -1,187 +1,39 @@
 import 'dart:convert';
-
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:solitaire/model/achievement.dart';
-import 'package:solitaire/model/background.dart';
-import 'package:solitaire/model/card_back.dart';
-import 'package:solitaire/model/active_game_snapshot.dart';
-import 'package:solitaire/model/difficulty.dart';
-import 'package:solitaire/model/game.dart';
-import 'package:solitaire/model/save_state.dart';
-import 'package:utils/utils.dart';
+import 'package:euchre/model/save_state.dart';
 
 part 'save_state_notifier.g.dart';
 
-const _saveStateKey = 'save';
+const _saveStateKey = 'euchre_save_state';
 
 @Riverpod(keepAlive: true)
 class SaveStateNotifier extends _$SaveStateNotifier {
   @override
-  FutureOr<SaveState> build() async {
-    final sharedPreferences = await SharedPreferences.getInstance();
-    final saveStateRaw = sharedPreferences.getString(_saveStateKey);
-    final saveState = guard(() => saveStateRaw
-        ?.mapIfNonNull((raw) => SaveState.fromJson(jsonDecode(raw))));
-    return saveState ?? SaveState.empty();
-  }
-
-  Future<void> saveGameCompleted({
-    required Game game,
-    required Difficulty difficulty,
-    required Duration duration,
-  }) async {
-    final saveState = await future;
-    await _saveState(saveState.withGameCompleted(
-        game: game, difficulty: difficulty, duration: duration));
-  }
-
-  Future<void> saveGameStarted({
-    required Game game,
-    required Difficulty difficulty,
-  }) async {
-    final saveState = await future;
-    await _saveState(
-        saveState.withGameStarted(game: game, difficulty: difficulty));
-  }
-
-  Future<void> saveDefaultDifficulty({
-    required Game game,
-    required Difficulty difficulty,
-  }) async {
-    final saveState = await future;
-    await _saveState(
-        saveState.withDefaultDifficulty(game: game, difficulty: difficulty));
-  }
-
-  Future<void> saveGameCloseOrRestart() async {
-    final saveState = await future;
-    await _saveState(saveState.withCloseOrRestart());
-  }
-
-  Future<void> saveBackground({required Background background}) async {
-    final saveState = await future;
-    await _saveState(saveState.withBackground(background: background));
-  }
-
-  Future<void> saveCardBack({required CardBack cardBack}) async {
-    final saveState = await future;
-    await _saveState(saveState.withCardBack(cardBack: cardBack));
-  }
-
-  Future<void> saveVolume({required double volume}) async {
-    final saveState = await future;
-    await _saveState(saveState.withVolume(volume: volume));
-  }
-
-  Future<void> saveEnableAutoMove({required bool enableAutoMove}) async {
-    final saveState = await future;
-    await _saveState(
-        saveState.withAutoMoveEnabled(enableAutoMove: enableAutoMove));
-  }
-
-  Future<void> saveAchievement({required Achievement achievement}) async {
-    final saveState = await future;
-    await _saveState(saveState.withAchievement(achievement: achievement));
-  }
-
-  Future<void> deleteAchievement({required Achievement achievement}) async {
-    final saveState = await future;
-    await _saveState(
-        saveState.withAchievementRemoved(achievement: achievement));
-  }
-
-  Future<void> saveCheatCode() async {
-    final saveState = await future;
-    await _saveState(saveState.withCheatCode());
-  }
-
-  Future<bool> spendHint() async {
-    final saveState = await future;
-    if (saveState.unlimitedHints) {
-      return true;
+  Future<EuchreSaveState?> build() async {
+    final prefs = await SharedPreferences.getInstance();
+    final json = prefs.getString(_saveStateKey);
+    if (json == null) return EuchreSaveState();
+    try {
+      return EuchreSaveState.fromJson(
+          jsonDecode(json) as Map<String, dynamic>);
+    } catch (_) {
+      return EuchreSaveState();
     }
-    if (saveState.hints <= 0) {
-      return false;
-    }
-    await _saveState(saveState.withHintSpent());
-    return true;
   }
 
-  Future<void> addHints(int amount) async {
-    if (amount <= 0) {
-      return;
-    }
-    final saveState = await future;
-    await _saveState(saveState.withHintsAdded(amount));
+  Future<void> updateState(EuchreSaveState Function(EuchreSaveState) updater) async {
+    final current = state.valueOrNull ?? EuchreSaveState();
+    final updated = updater(current);
+    state = AsyncData(updated);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_saveStateKey, jsonEncode(updated.toJson()));
   }
 
-  Future<void> deleteAllData() async {
-    await _saveState(SaveState.empty());
-  }
-
-  Future<void> setAdsRemoved() async {
-    final saveState = await future;
-    await _saveState(saveState.copyWith(adsRemoved: true));
-  }
-
-  Future<void> setUnlimitedHints() async {
-    final saveState = await future;
-    await _saveState(saveState.copyWith(unlimitedHints: true));
-  }
-
-  Future<void> saveDailyCompletion({
-    required Game game,
-    required int puzzleNumber,
-    required Duration duration,
-    bool submitted = false,
-  }) async {
-    final saveState = await future;
-    await _saveState(saveState.withDailyCompletion(
-      game: game,
-      puzzleNumber: puzzleNumber,
-      duration: duration,
-      submitted: submitted,
-    ));
-  }
-
-  Future<void> markDailySubmission({
-    required Game game,
-    required int puzzleNumber,
-  }) async {
-    final saveState = await future;
-    await _saveState(saveState.withDailySubmission(
-      game: game,
-      puzzleNumber: puzzleNumber,
-    ));
-  }
-
-  Future<void> markTutorialPromptSeen(Game game) async {
-    final saveState = await future;
-    if (saveState.tutorialPromptsSeen[game] == true) {
-      return;
-    }
-    await _saveState(saveState.withTutorialPromptSeen(game));
-  }
-
-  Future<void> saveActiveGameSnapshot(
-      ActiveGameSnapshot snapshot) async {
-    final saveState = await future;
-    await _saveState(saveState.withActiveGame(snapshot));
-  }
-
-  Future<void> clearActiveGame(Game game) async {
-    final saveState = await future;
-    if (!saveState.activeGames.containsKey(game)) {
-      return;
-    }
-    await _saveState(saveState.withoutActiveGame(game));
-  }
-
-  Future<void> _saveState(SaveState state) async {
-    this.state = AsyncValue.data(state);
-    final raw = jsonEncode(state.toJson());
-    final sharedPreferences = await SharedPreferences.getInstance();
-    await sharedPreferences.setString(_saveStateKey, raw);
+  Future<void> recordGameResult({required bool won}) async {
+    await updateState((s) => s.copyWith(
+          gamesPlayed: s.gamesPlayed + 1,
+          gamesWon: won ? s.gamesWon + 1 : s.gamesWon,
+        ));
   }
 }

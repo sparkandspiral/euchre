@@ -1,5 +1,5 @@
 import 'package:card_game/card_game.dart';
-import 'package:solitaire/model/card_back.dart';
+import 'package:euchre/model/card_back.dart';
 import 'package:vector_graphics/vector_graphics.dart';
 
 class PlayingCardAssetBundleCache {

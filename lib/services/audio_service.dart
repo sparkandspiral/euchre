@@ -1,7 +1,7 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:solitaire/providers/save_state_notifier.dart';
+import 'package:euchre/providers/save_state_notifier.dart';
 
 part 'audio_service.g.dart';
 
@@ -18,8 +18,6 @@ class AudioService {
   final Map<String, _SoundPool> _pools = {};
 
   void playPlace() => _playAudio('sounds/place.wav');
-  void playUndo() => _playAudio('sounds/undo.wav');
-  void playRedraw() => _playAudio('sounds/deck_redraw.wav');
   void playDraw() => _playAudio('sounds/draw.wav');
   void playWin() => _playAudio('sounds/win.wav');
 

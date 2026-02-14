@@ -6,12 +6,12 @@ part of 'save_state_notifier.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$saveStateNotifierHash() => r'79df483c0fe8958a39349dc3e3664d56d85c0f9f';
+String _$saveStateNotifierHash() => r'c6f852899ca167815eeffea6f274f7a2ee1bbda2';
 
 /// See also [SaveStateNotifier].
 @ProviderFor(SaveStateNotifier)
 final saveStateNotifierProvider =
-    AsyncNotifierProvider<SaveStateNotifier, SaveState>.internal(
+    AsyncNotifierProvider<SaveStateNotifier, EuchreSaveState?>.internal(
   SaveStateNotifier.new,
   name: r'saveStateNotifierProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -21,6 +21,6 @@ final saveStateNotifierProvider =
   allTransitiveDependencies: null,
 );
 
-typedef _$SaveStateNotifier = AsyncNotifier<SaveState>;
+typedef _$SaveStateNotifier = AsyncNotifier<EuchreSaveState?>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

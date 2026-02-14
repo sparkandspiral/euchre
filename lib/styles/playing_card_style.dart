@@ -1,8 +1,8 @@
 import 'package:card_game/card_game.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:solitaire/model/card_back.dart';
-import 'package:solitaire/styles/playing_card_builder.dart';
+import 'package:euchre/model/card_back.dart';
+import 'package:euchre/styles/playing_card_builder.dart';
 
 CardGameStyle<SuitedCard, G> playingCardStyle<G>({
   double sizeMultiplier = 1,

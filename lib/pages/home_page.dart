@@ -5,6 +5,7 @@ import 'package:euchre/model/bot_difficulty.dart';
 import 'package:euchre/model/card_back.dart';
 import 'package:euchre/pages/game_page.dart';
 import 'package:euchre/pages/settings_page.dart';
+import 'package:euchre/pages/strategy_page.dart';
 import 'package:euchre/providers/save_state_notifier.dart';
 
 class HomePage extends HookConsumerWidget {
@@ -120,26 +121,53 @@ class HomePage extends HookConsumerWidget {
                       ),
                     ),
                   ),
-                  SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).push(MaterialPageRoute(
-                          builder: (_) => SettingsPage(),
-                        ));
-                      },
-                      icon: Icon(Icons.settings, size: 20),
-                      label: Text('Settings'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white70,
-                        side: BorderSide(color: Colors.white24),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 48,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(MaterialPageRoute(
+                                builder: (_) => SettingsPage(),
+                              ));
+                            },
+                            icon: Icon(Icons.settings, size: 20),
+                            label: Text('Settings'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white70,
+                              side: BorderSide(color: Colors.white24),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: SizedBox(
+                          height: 48,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(MaterialPageRoute(
+                                builder: (_) => StrategyPage(),
+                              ));
+                            },
+                            icon: Icon(Icons.school, size: 20),
+                            label: Text('Strategy'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.amber.shade200,
+                              side: BorderSide(color: Colors.amber.withValues(alpha: 0.3)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   SizedBox(height: 24),
                   if (saveState != null && saveState.gamesPlayed > 0)

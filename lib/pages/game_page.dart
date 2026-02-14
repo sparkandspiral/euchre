@@ -6,6 +6,7 @@ import 'package:euchre/model/bot_difficulty.dart';
 import 'package:euchre/model/euchre_game_state.dart';
 import 'package:euchre/model/game_phase.dart';
 import 'package:card_game/card_game.dart';
+import 'package:euchre/ai/coach_advisor.dart';
 import 'package:euchre/logic/card_ranking.dart';
 import 'package:euchre/model/euchre_round_state.dart';
 import 'package:euchre/model/player.dart';
@@ -79,6 +80,8 @@ class GamePage extends HookConsumerWidget {
                           child: CircularProgressIndicator(
                               color: Colors.white54)),
                 ),
+                if (saveState?.coachMode == true && round != null)
+                  _CoachBanner(round: round, scores: state.scores),
                 _BottomBar(
                   state: state,
                   onMenu: () => _showMenu(context, engine, ref),
@@ -335,6 +338,99 @@ class _StatusChip extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(color: color, fontSize: 11),
+      ),
+    );
+  }
+}
+
+class _CoachBanner extends StatefulWidget {
+  final EuchreRoundState round;
+  final Map<Team, int> scores;
+  const _CoachBanner({required this.round, required this.scores});
+
+  @override
+  State<_CoachBanner> createState() => _CoachBannerState();
+}
+
+class _CoachBannerState extends State<_CoachBanner> {
+  static const _advisor = CoachAdvisor();
+  bool _expanded = false;
+
+  @override
+  void didUpdateWidget(_CoachBanner old) {
+    super.didUpdateWidget(old);
+    // Collapse when the phase or current player changes
+    if (old.round.phase != widget.round.phase ||
+        old.round.currentPlayer != widget.round.currentPlayer ||
+        old.round.currentTrick?.plays.length !=
+            widget.round.currentTrick?.plays.length) {
+      _expanded = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final advice = _advisor.advise(widget.round, widget.scores);
+    if (advice == null || advice.recommendation.isEmpty) {
+      return SizedBox.shrink();
+    }
+
+    return GestureDetector(
+      onTap: () => setState(() => _expanded = !_expanded),
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.amber.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.school, color: Colors.amber, size: 16),
+                SizedBox(width: 6),
+                Text(
+                  'Coach: ',
+                  style: TextStyle(
+                    color: Colors.amber,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    advice.recommendation,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Icon(
+                  _expanded ? Icons.expand_less : Icons.expand_more,
+                  color: Colors.amber.withValues(alpha: 0.6),
+                  size: 18,
+                ),
+              ],
+            ),
+            if (_expanded) ...[
+              SizedBox(height: 6),
+              Text(
+                advice.reasoning,
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 11,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

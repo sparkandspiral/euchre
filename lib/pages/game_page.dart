@@ -90,7 +90,13 @@ class GamePage extends HookConsumerWidget {
             ),
           ),
           if (round != null && round.phase.isBidding)
-            BidOverlay(round: round, engine: engine),
+            BidOverlay(
+              round: round,
+              engine: engine,
+              coachAdvice: saveState?.coachMode == true
+                  ? const CoachAdvisor().advise(round, state.scores)
+                  : null,
+            ),
           if (round != null &&
               round.phase == GamePhase.dealerDiscard &&
               round.dealer == PlayerPosition.south)
@@ -428,6 +434,36 @@ class _CoachBannerState extends State<_CoachBanner> {
                   height: 1.4,
                 ),
               ),
+              if (advice.gameContext.isNotEmpty) ...[
+                SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Game Situation',
+                          style: TextStyle(
+                            color: Colors.amber.withValues(alpha: 0.8),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          )),
+                      SizedBox(height: 3),
+                      Text(
+                        advice.gameContext,
+                        style: TextStyle(
+                            color: Colors.white54,
+                            fontSize: 10,
+                            height: 1.3),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ],
         ),

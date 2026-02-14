@@ -9,6 +9,7 @@ class EuchreSaveState {
   final BotDifficulty difficulty;
   final int gamesWon;
   final int gamesPlayed;
+  final bool coachMode;
 
   const EuchreSaveState({
     this.cardBack = CardBack.redStripes,
@@ -17,6 +18,7 @@ class EuchreSaveState {
     this.difficulty = BotDifficulty.medium,
     this.gamesWon = 0,
     this.gamesPlayed = 0,
+    this.coachMode = false,
   });
 
   EuchreSaveState copyWith({
@@ -26,6 +28,7 @@ class EuchreSaveState {
     BotDifficulty? difficulty,
     int? gamesWon,
     int? gamesPlayed,
+    bool? coachMode,
   }) {
     return EuchreSaveState(
       cardBack: cardBack ?? this.cardBack,
@@ -34,6 +37,7 @@ class EuchreSaveState {
       difficulty: difficulty ?? this.difficulty,
       gamesWon: gamesWon ?? this.gamesWon,
       gamesPlayed: gamesPlayed ?? this.gamesPlayed,
+      coachMode: coachMode ?? this.coachMode,
     );
   }
 
@@ -44,6 +48,7 @@ class EuchreSaveState {
         'difficulty': difficulty.index,
         'gamesWon': gamesWon,
         'gamesPlayed': gamesPlayed,
+        'coachMode': coachMode,
       };
 
   factory EuchreSaveState.fromJson(Map<String, dynamic> json) {
@@ -54,6 +59,7 @@ class EuchreSaveState {
       difficulty: BotDifficulty.values[json['difficulty'] as int? ?? 1],
       gamesWon: json['gamesWon'] as int? ?? 0,
       gamesPlayed: json['gamesPlayed'] as int? ?? 0,
+      coachMode: json['coachMode'] as bool? ?? false,
     );
   }
 }

@@ -126,6 +126,37 @@ class SettingsPage extends ConsumerWidget {
           ),
           SizedBox(height: 32),
 
+          // Coach Mode
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Coach Mode',
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600)),
+                    SizedBox(height: 4),
+                    Text(
+                      'Shows optimal play recommendations with reasoning during your turn',
+                      style: TextStyle(color: Colors.white38, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: saveState.coachMode,
+                onChanged: (v) => ref
+                    .read(saveStateNotifierProvider.notifier)
+                    .updateState((s) => s.copyWith(coachMode: v)),
+                activeColor: Colors.amber,
+              ),
+            ],
+          ),
+          SizedBox(height: 32),
+
           // Stats
           Text('Statistics',
               style: TextStyle(

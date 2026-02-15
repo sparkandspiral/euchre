@@ -365,19 +365,19 @@ class _StatusRow extends StatelessWidget {
       }
     }
 
-    if (items.isEmpty) return SizedBox.shrink();
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          for (int i = 0; i < items.length; i++) ...[
-            if (i > 0) SizedBox(width: 8),
-            items[i],
-          ],
-        ],
-      ),
+    return SizedBox(
+      height: 24,
+      child: items.isNotEmpty
+          ? Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (int i = 0; i < items.length; i++) ...[
+                  if (i > 0) SizedBox(width: 8),
+                  items[i],
+                ],
+              ],
+            )
+          : null,
     );
   }
 

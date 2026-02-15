@@ -11,12 +11,14 @@ import 'package:euchre/model/euchre_round_state.dart';
 import 'package:euchre/model/game_phase.dart';
 import 'package:euchre/model/player.dart';
 import 'package:euchre/model/trick.dart';
+import 'package:euchre/utils/card_description.dart';
 
 class GameEngine {
   final BotDifficulty difficulty;
   final void Function(EuchreGameState) onStateChanged;
   final void Function()? onCardPlayed;
   final void Function()? onWin;
+  final void Function(String message)? onGameEvent;
 
   late final BotPlayer _bot;
   EuchreGameState _state;
@@ -28,6 +30,7 @@ class GameEngine {
     required this.onStateChanged,
     this.onCardPlayed,
     this.onWin,
+    this.onGameEvent,
   }) : _state = EuchreGameState(difficulty: difficulty) {
     _bot = BotPlayer(difficulty);
   }
@@ -143,6 +146,11 @@ class GameEngine {
     final dealer = round.dealer;
     final trumpSuit = round.turnedCard.suit;
 
+    final suitName = describeSuitName(trumpSuit);
+    final alone = goAlone ? ' and is going alone!' : '';
+    onGameEvent?.call(
+        '${player.displayName} ordered up $suitName$alone');
+
     // Dealer picks up the turned card
     final dealerHand = List<SuitedCard>.from(round.handFor(dealer));
     dealerHand.add(round.turnedCard);
@@ -179,6 +187,11 @@ class GameEngine {
       {bool goAlone = false}) {
     var round = _state.currentRound!;
 
+    final suitName = describeSuitName(suit);
+    final alone = goAlone ? ' and is going alone!' : '';
+    onGameEvent?.call(
+        '${player.displayName} called $suitName as trump$alone');
+
     PlayerPosition? sittingOut;
     if (goAlone) {
       sittingOut = player.partner;
@@ -210,6 +223,7 @@ class GameEngine {
   void _handlePass() {
     var round = _state.currentRound!;
     final passer = round.currentPlayer;
+    onGameEvent?.call('${passer.displayName} passed');
     final nextPlayer = _nextActivePlayer(round.currentPlayer.next, round);
     final newPassedPlayers = [...round.passedPlayers, passer];
 

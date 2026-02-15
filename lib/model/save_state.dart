@@ -10,6 +10,8 @@ class EuchreSaveState {
   final int gamesWon;
   final int gamesPlayed;
   final bool coachMode;
+  final bool practiceMode;
+  final Set<String> completedLessons;
 
   const EuchreSaveState({
     this.cardBack = CardBack.redStripes,
@@ -19,6 +21,8 @@ class EuchreSaveState {
     this.gamesWon = 0,
     this.gamesPlayed = 0,
     this.coachMode = false,
+    this.practiceMode = false,
+    this.completedLessons = const {},
   });
 
   EuchreSaveState copyWith({
@@ -29,6 +33,8 @@ class EuchreSaveState {
     int? gamesWon,
     int? gamesPlayed,
     bool? coachMode,
+    bool? practiceMode,
+    Set<String>? completedLessons,
   }) {
     return EuchreSaveState(
       cardBack: cardBack ?? this.cardBack,
@@ -38,6 +44,8 @@ class EuchreSaveState {
       gamesWon: gamesWon ?? this.gamesWon,
       gamesPlayed: gamesPlayed ?? this.gamesPlayed,
       coachMode: coachMode ?? this.coachMode,
+      practiceMode: practiceMode ?? this.practiceMode,
+      completedLessons: completedLessons ?? this.completedLessons,
     );
   }
 
@@ -49,6 +57,8 @@ class EuchreSaveState {
         'gamesWon': gamesWon,
         'gamesPlayed': gamesPlayed,
         'coachMode': coachMode,
+        'practiceMode': practiceMode,
+        'completedLessons': completedLessons.toList(),
       };
 
   factory EuchreSaveState.fromJson(Map<String, dynamic> json) {
@@ -60,6 +70,11 @@ class EuchreSaveState {
       gamesWon: json['gamesWon'] as int? ?? 0,
       gamesPlayed: json['gamesPlayed'] as int? ?? 0,
       coachMode: json['coachMode'] as bool? ?? false,
+      practiceMode: json['practiceMode'] as bool? ?? false,
+      completedLessons: (json['completedLessons'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toSet() ??
+          {},
     );
   }
 }

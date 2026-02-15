@@ -36,4 +36,10 @@ class SaveStateNotifier extends _$SaveStateNotifier {
           gamesWon: won ? s.gamesWon + 1 : s.gamesWon,
         ));
   }
+
+  Future<void> completeLesson(String lessonId) async {
+    await updateState((s) => s.copyWith(
+          completedLessons: {...s.completedLessons, lessonId},
+        ));
+  }
 }

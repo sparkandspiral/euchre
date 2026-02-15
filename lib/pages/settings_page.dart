@@ -150,8 +150,45 @@ class SettingsPage extends ConsumerWidget {
                 value: saveState.coachMode,
                 onChanged: (v) => ref
                     .read(saveStateNotifierProvider.notifier)
-                    .updateState((s) => s.copyWith(coachMode: v)),
+                    .updateState((s) => s.copyWith(
+                          coachMode: v,
+                          practiceMode: v ? false : s.practiceMode,
+                        )),
                 activeColor: Colors.amber,
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
+
+          // Practice Mode
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Practice Mode',
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600)),
+                    SizedBox(height: 4),
+                    Text(
+                      'Get feedback after each play instead of before - tests your instincts',
+                      style: TextStyle(color: Colors.white38, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: saveState.practiceMode,
+                onChanged: (v) => ref
+                    .read(saveStateNotifierProvider.notifier)
+                    .updateState((s) => s.copyWith(
+                          practiceMode: v,
+                          coachMode: v ? false : s.coachMode,
+                        )),
+                activeColor: Colors.blue,
               ),
             ],
           ),

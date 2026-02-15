@@ -221,20 +221,31 @@ class _CardPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const spacing = 28.0;
+    const cardW = 55.0;
+    const cardH = 76.0;
+    const fanWidth = 4 * spacing + cardW; // 167
+
     return SizedBox(
       height: 100,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          for (int i = 0; i < 5; i++)
-            Transform.translate(
-              offset: Offset((i - 2) * 28.0, 0),
-              child: Transform.rotate(
-                angle: (i - 2) * 0.08,
-                child: _AnimatedCard(index: i, cardBack: cardBack),
-              ),
-            ),
-        ],
+      child: Center(
+        child: SizedBox(
+          width: fanWidth,
+          height: 100,
+          child: Stack(
+            children: [
+              for (int i = 0; i < 5; i++)
+                Positioned(
+                  left: i * spacing,
+                  top: (100 - cardH) / 2,
+                  child: Transform.rotate(
+                    angle: (i - 2) * 0.08,
+                    child: _AnimatedCard(index: i, cardBack: cardBack),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

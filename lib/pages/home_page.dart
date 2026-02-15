@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -230,23 +231,107 @@ class _CardPreview extends StatelessWidget {
               offset: Offset((i - 2) * 28.0, 0),
               child: Transform.rotate(
                 angle: (i - 2) * 0.08,
-                child: SizedBox(
-                  width: 55,
-                  height: 76,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      foregroundDecoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.black, width: 1.5),
-                      ),
-                      child: cardBack.build(),
-                    ),
-                  ),
-                ),
+                child: _AnimatedCard(index: i, cardBack: cardBack),
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _AnimatedCard extends StatefulWidget {
+  final int index;
+  final CardBack cardBack;
+
+  const _AnimatedCard({required this.index, required this.cardBack});
+
+  @override
+  State<_AnimatedCard> createState() => _AnimatedCardState();
+}
+
+class _AnimatedCardState extends State<_AnimatedCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  int _effect = 0;
+  static final _random = math.Random();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onTap() {
+    if (_controller.isAnimating) return;
+    setState(() => _effect = _random.nextInt(4));
+    _controller.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final card = SizedBox(
+      width: 55,
+      height: 76,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          foregroundDecoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.black, width: 1.5),
+          ),
+          child: widget.cardBack.build(),
+        ),
+      ),
+    );
+
+    return GestureDetector(
+      onTap: _onTap,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          if (!_controller.isAnimating) return child!;
+          final t = _controller.value;
+          switch (_effect) {
+            case 0: // Spin
+              return Transform(
+                alignment: Alignment.center,
+                transform: Matrix4.identity()
+                  ..setEntry(3, 2, 0.001)
+                  ..rotateY(t * 2 * math.pi),
+                child: child,
+              );
+            case 1: // Bounce
+              final bounce = math.sin(t * math.pi) * -20;
+              final scale = 1.0 + math.sin(t * math.pi) * 0.15;
+              return Transform.translate(
+                offset: Offset(0, bounce),
+                child: Transform.scale(scale: scale, child: child),
+              );
+            case 2: // Wiggle
+              final wiggle = math.sin(t * math.pi * 6) * 0.15 * (1 - t);
+              return Transform.rotate(angle: wiggle, child: child);
+            case 3: // Pop + tilt
+              final scale = 1.0 + math.sin(t * math.pi) * 0.3;
+              final tilt = math.sin(t * math.pi * 2) * 0.1 * (1 - t);
+              return Transform.scale(
+                scale: scale,
+                child: Transform.rotate(angle: tilt, child: child),
+              );
+            default:
+              return child!;
+          }
+        },
+        child: card,
       ),
     );
   }

@@ -1,11 +1,11 @@
 {
-    "name": "cards",
-    "short_name": "cards",
+    "name": "Euchre",
+    "short_name": "Euchre",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A collection of card games.",
+    "background_color": "#0A2340",
+    "theme_color": "#1B5E20",
+    "description": "A classic trick-taking card game.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

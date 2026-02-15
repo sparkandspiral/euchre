@@ -51,6 +51,12 @@ class GameEngine {
     startNewRound();
   }
 
+  /// Resume a saved game.
+  void resumeGame(EuchreGameState savedState) {
+    _updateState(savedState);
+    _scheduleBotActionIfNeeded();
+  }
+
   /// Deal cards and start bidding.
   void startNewRound() {
     final dealer = _state.currentDealer;

@@ -10,6 +10,7 @@ import 'package:euchre/ai/coach_advisor.dart';
 import 'package:euchre/logic/card_ranking.dart';
 import 'package:euchre/model/euchre_round_state.dart';
 import 'package:euchre/model/player.dart';
+import 'package:euchre/model/save_state.dart';
 import 'package:euchre/providers/save_state_notifier.dart';
 import 'package:euchre/services/audio_service.dart';
 import 'package:euchre/services/game_engine.dart';
@@ -23,33 +24,45 @@ import 'package:euchre/widgets/trump_indicator.dart';
 
 class GamePage extends HookConsumerWidget {
   final BotDifficulty difficulty;
+  final EuchreGameState? resumeState;
 
-  const GamePage({super.key, required this.difficulty});
+  const GamePage({super.key, required this.difficulty, this.resumeState});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final saveState = ref.watch(saveStateNotifierProvider).valueOrNull;
     final gameState = useState<EuchreGameState>(
-        EuchreGameState(difficulty: difficulty));
+        resumeState ?? EuchreGameState(difficulty: difficulty));
     final confetti = useMemoized(() => ConfettiController(
         duration: Duration(seconds: 3)));
     final audioService = ref.read(audioServiceProvider);
+    final notifier = ref.read(saveStateNotifierProvider.notifier);
 
     final engine = useMemoized(() => GameEngine(
           difficulty: difficulty,
-          onStateChanged: (state) => gameState.value = state,
+          onStateChanged: (state) {
+            gameState.value = state;
+            // Auto-save: persist game state for resume (clear on game over)
+            if (state.isGameOver) {
+              notifier.clearSavedGame();
+            } else {
+              notifier.saveGame(state);
+            }
+          },
           onCardPlayed: () => audioService.playPlace(),
           onWin: () {
             audioService.playWin();
             confetti.play();
-            ref
-                .read(saveStateNotifierProvider.notifier)
-                .recordGameResult(won: true);
+            notifier.recordGameResult(won: true);
           },
         ));
 
     useEffect(() {
-      engine.startGame();
+      if (resumeState != null) {
+        engine.resumeGame(resumeState!);
+      } else {
+        engine.startGame();
+      }
       return engine.dispose;
     }, []);
 
@@ -218,30 +231,70 @@ class GamePage extends HookConsumerWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(Icons.refresh, color: Colors.white70),
-              title: Text('New Game', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(ctx);
-                engine.startGame();
-              },
+      builder: (ctx) => HookConsumer(
+        builder: (ctx, ref, _) {
+          final saveState =
+              ref.watch(saveStateNotifierProvider).valueOrNull ??
+                  EuchreSaveState();
+          return Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SwitchListTile(
+                  secondary: Icon(Icons.school, color: Colors.amber),
+                  title: Text('Coach Mode',
+                      style: TextStyle(color: Colors.white)),
+                  subtitle: Text('Get advice before each play',
+                      style: TextStyle(color: Colors.white38, fontSize: 12)),
+                  value: saveState.coachMode,
+                  activeColor: Colors.amber,
+                  onChanged: (v) => ref
+                      .read(saveStateNotifierProvider.notifier)
+                      .updateState((s) => s.copyWith(
+                            coachMode: v,
+                            practiceMode: v ? false : s.practiceMode,
+                          )),
+                ),
+                SwitchListTile(
+                  secondary: Icon(Icons.fitness_center,
+                      color: Colors.blue.shade200),
+                  title: Text('Practice Mode',
+                      style: TextStyle(color: Colors.white)),
+                  subtitle: Text('Get feedback after each play',
+                      style: TextStyle(color: Colors.white38, fontSize: 12)),
+                  value: saveState.practiceMode,
+                  activeColor: Colors.blue.shade200,
+                  onChanged: (v) => ref
+                      .read(saveStateNotifierProvider.notifier)
+                      .updateState((s) => s.copyWith(
+                            practiceMode: v,
+                            coachMode: v ? false : s.coachMode,
+                          )),
+                ),
+                Divider(color: Colors.white12),
+                ListTile(
+                  leading: Icon(Icons.refresh, color: Colors.white70),
+                  title:
+                      Text('New Game', style: TextStyle(color: Colors.white)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    engine.startGame();
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.exit_to_app, color: Colors.white70),
+                  title: Text('Exit to Menu',
+                      style: TextStyle(color: Colors.white)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.pop(context);
+                  },
+                ),
+              ],
             ),
-            ListTile(
-              leading: Icon(Icons.exit_to_app, color: Colors.white70),
-              title:
-                  Text('Exit to Menu', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

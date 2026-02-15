@@ -46,6 +46,7 @@ class EuchreTable extends StatelessWidget {
             _LabeledHand(
               label: PlayerPosition.north.displayName,
               isCurrentPlayer: round.currentPlayer == PlayerPosition.north,
+              hasPassed: _showPassed(PlayerPosition.north),
               child: _BotHand(
                 cards: round.handFor(PlayerPosition.north),
                 cardWidth: cardWidth,
@@ -65,6 +66,7 @@ class EuchreTable extends StatelessWidget {
                   _LabeledVerticalHand(
                     label: PlayerPosition.west.displayName,
                     isCurrentPlayer: round.currentPlayer == PlayerPosition.west,
+                    hasPassed: _showPassed(PlayerPosition.west),
                     child: _VerticalBotHand(
                       cards: round.handFor(PlayerPosition.west),
                       cardWidth: cardWidth,
@@ -90,6 +92,7 @@ class EuchreTable extends StatelessWidget {
                   _LabeledVerticalHand(
                     label: PlayerPosition.east.displayName,
                     isCurrentPlayer: round.currentPlayer == PlayerPosition.east,
+                    hasPassed: _showPassed(PlayerPosition.east),
                     child: _VerticalBotHand(
                       cards: round.handFor(PlayerPosition.east),
                       cardWidth: cardWidth,
@@ -124,6 +127,7 @@ class EuchreTable extends StatelessWidget {
             _LabeledHand(
               label: PlayerPosition.south.displayName,
               isCurrentPlayer: round.currentPlayer == PlayerPosition.south,
+              hasPassed: _showPassed(PlayerPosition.south),
               child: _HumanHand(
                 cards: round.handFor(PlayerPosition.south),
                 cardWidth: cardWidth,
@@ -140,6 +144,9 @@ class EuchreTable extends StatelessWidget {
       );
     });
   }
+
+  bool _showPassed(PlayerPosition pos) =>
+      round.phase.isBidding && round.passedPlayers.contains(pos);
 
   CardSuit? _effectiveLedSuit() {
     final trick = round.currentTrick;
@@ -422,11 +429,13 @@ class _VerticalBotHand extends StatelessWidget {
 class _LabeledHand extends StatelessWidget {
   final String label;
   final bool isCurrentPlayer;
+  final bool hasPassed;
   final Widget child;
 
   const _LabeledHand({
     required this.label,
     required this.isCurrentPlayer,
+    this.hasPassed = false,
     required this.child,
   });
 
@@ -437,13 +446,23 @@ class _LabeledHand extends StatelessWidget {
       children: [
         child,
         SizedBox(height: 2),
-        Text(
-          label,
-          style: TextStyle(
-            color: isCurrentPlayer ? Colors.amber : Colors.white54,
-            fontSize: 11,
-            fontWeight: isCurrentPlayer ? FontWeight.bold : FontWeight.normal,
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isCurrentPlayer ? Colors.amber : Colors.white54,
+                fontSize: 11,
+                fontWeight:
+                    isCurrentPlayer ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            if (hasPassed) ...[
+              SizedBox(width: 6),
+              _PassedChip(),
+            ],
+          ],
         ),
       ],
     );
@@ -453,11 +472,13 @@ class _LabeledHand extends StatelessWidget {
 class _LabeledVerticalHand extends StatelessWidget {
   final String label;
   final bool isCurrentPlayer;
+  final bool hasPassed;
   final Widget child;
 
   const _LabeledVerticalHand({
     required this.label,
     required this.isCurrentPlayer,
+    this.hasPassed = false,
     required this.child,
   });
 
@@ -477,7 +498,35 @@ class _LabeledVerticalHand extends StatelessWidget {
             fontWeight: isCurrentPlayer ? FontWeight.bold : FontWeight.normal,
           ),
         ),
+        if (hasPassed) ...[
+          SizedBox(height: 3),
+          _PassedChip(),
+        ],
       ],
+    );
+  }
+}
+
+class _PassedChip extends StatelessWidget {
+  const _PassedChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Text(
+        'Passed',
+        style: TextStyle(
+          color: Colors.white54,
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
     );
   }
 }

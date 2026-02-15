@@ -4,6 +4,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:euchre/model/bot_difficulty.dart';
 import 'package:euchre/model/card_back.dart';
+import 'package:euchre/model/euchre_game_state.dart';
 import 'package:euchre/pages/game_page.dart';
 import 'package:euchre/pages/lessons_page.dart';
 import 'package:euchre/pages/settings_page.dart';
@@ -17,6 +18,8 @@ class HomePage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final saveState = ref.watch(saveStateNotifierProvider).valueOrNull;
     final difficulty = useState(saveState?.difficulty ?? BotDifficulty.medium);
+    final savedGame = useState<EuchreGameState?>(null);
+    final refreshKey = useState(0);
 
     useEffect(() {
       if (saveState != null) {
@@ -24,6 +27,14 @@ class HomePage extends HookConsumerWidget {
       }
       return null;
     }, [saveState?.difficulty]);
+
+    // Check for saved game on mount and when returning from game
+    useEffect(() {
+      ref.read(saveStateNotifierProvider.notifier).loadSavedGame().then(
+        (game) => savedGame.value = game,
+      );
+      return null;
+    }, [refreshKey.value]);
 
     return Scaffold(
       backgroundColor: Color(0xFF0A2340),
@@ -96,32 +107,94 @@ class HomePage extends HookConsumerWidget {
                     textAlign: TextAlign.center,
                   ),
                   SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).push(MaterialPageRoute(
-                          builder: (_) =>
-                              GamePage(difficulty: difficulty.value),
-                        ));
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF2E7D32),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                  if (savedGame.value != null) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          await Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => GamePage(
+                              difficulty: savedGame.value!.difficulty,
+                              resumeState: savedGame.value,
+                            ),
+                          ));
+                          refreshKey.value++;
+                        },
+                        icon: Icon(Icons.play_arrow),
+                        label: Text(
+                          'RESUME GAME',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2,
+                          ),
                         ),
-                      ),
-                      child: Text(
-                        'NEW GAME',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 2,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFF2E7D32),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
                       ),
                     ),
+                    SizedBox(height: 12),
+                  ],
+                  SizedBox(
+                    width: double.infinity,
+                    height: savedGame.value != null ? 48 : 56,
+                    child: savedGame.value != null
+                        ? OutlinedButton(
+                            onPressed: () async {
+                              await Navigator.of(context)
+                                  .push(MaterialPageRoute(
+                                builder: (_) =>
+                                    GamePage(difficulty: difficulty.value),
+                              ));
+                              refreshKey.value++;
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white70,
+                              side: BorderSide(color: Colors.white24),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              'NEW GAME',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 2,
+                              ),
+                            ),
+                          )
+                        : ElevatedButton(
+                            onPressed: () async {
+                              await Navigator.of(context)
+                                  .push(MaterialPageRoute(
+                                builder: (_) =>
+                                    GamePage(difficulty: difficulty.value),
+                              ));
+                              refreshKey.value++;
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF2E7D32),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: Text(
+                              'NEW GAME',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 2,
+                              ),
+                            ),
+                          ),
                   ),
                   SizedBox(height: 12),
                   Row(

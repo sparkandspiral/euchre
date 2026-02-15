@@ -13,12 +13,14 @@ class EuchreTable extends StatelessWidget {
   final EuchreRoundState round;
   final void Function(SuitedCard)? onCardTap;
   final CardBack? cardBack;
+  final bool showDiscardHint;
 
   const EuchreTable({
     super.key,
     required this.round,
     this.onCardTap,
     this.cardBack,
+    this.showDiscardHint = false,
   });
 
   @override
@@ -102,6 +104,21 @@ class EuchreTable extends StatelessWidget {
             ),
 
             SizedBox(height: spacing),
+
+            // Discard hint
+            if (showDiscardHint)
+              Padding(
+                padding: EdgeInsets.only(bottom: 4),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black87,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text('Tap a card to discard',
+                      style: TextStyle(color: Colors.white, fontSize: 13)),
+                ),
+              ),
 
             // South hand (human, face up)
             _LabeledHand(
@@ -262,51 +279,63 @@ class _BotHand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (cards.isEmpty) return SizedBox(height: cardHeight * 0.5);
-
     final smallWidth = cardWidth * 0.85;
     final smallHeight = cardHeight * 0.85;
     final overlap = smallWidth * 0.4;
-    final totalWidth = smallWidth + (cards.length - 1) * overlap;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (isCurrentPlayer)
-          Container(
-            width: 6,
-            height: 6,
-            margin: EdgeInsets.only(bottom: 4),
-            decoration: BoxDecoration(
-              color: Colors.amber,
-              shape: BoxShape.circle,
-            ),
-          ),
         SizedBox(
-          height: smallHeight,
-          width: totalWidth,
-          child: Stack(
-            children: [
-              for (int i = 0; i < cards.length; i++)
-                Positioned(
-                  left: i * overlap,
-                  child: SizedBox(
-                    width: smallWidth,
-                    height: smallHeight,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        foregroundDecoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.black, width: 1.5),
-                        ),
-                        child: cardBack.build(),
-                      ),
+          height: 10,
+          child: isCurrentPlayer
+              ? Center(
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: Colors.amber,
+                      shape: BoxShape.circle,
                     ),
                   ),
-                ),
-            ],
-          ),
+                )
+              : null,
+        ),
+        SizedBox(
+          height: smallHeight,
+          child: cards.isNotEmpty
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: smallWidth + (cards.length - 1) * overlap,
+                      child: Stack(
+                        children: [
+                          for (int i = 0; i < cards.length; i++)
+                            Positioned(
+                              left: i * overlap,
+                              child: SizedBox(
+                                width: smallWidth,
+                                height: smallHeight,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    foregroundDecoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                          color: Colors.black, width: 1.5),
+                                    ),
+                                    child: cardBack.build(),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                )
+              : null,
         ),
       ],
     );
@@ -332,51 +361,58 @@ class _VerticalBotHand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (cards.isEmpty) return SizedBox(width: cardWidth * 0.5);
-
     final smallWidth = cardWidth * 0.75;
     final smallHeight = cardHeight * 0.75;
     final overlap = smallHeight * 0.35;
-    final totalHeight = smallHeight + (cards.length - 1) * overlap;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (isCurrentPlayer)
-          Container(
-            width: 6,
-            height: 6,
-            margin: EdgeInsets.only(right: 4),
-            decoration: BoxDecoration(
-              color: Colors.amber,
-              shape: BoxShape.circle,
-            ),
-          ),
         SizedBox(
-          width: smallWidth,
-          height: totalHeight,
-          child: Stack(
-            children: [
-              for (int i = 0; i < cards.length; i++)
-                Positioned(
-                  top: i * overlap,
-                  child: SizedBox(
-                    width: smallWidth,
-                    height: smallHeight,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: Container(
-                        foregroundDecoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.black, width: 1),
-                        ),
-                        child: cardBack.build(),
-                      ),
+          width: 10,
+          child: isCurrentPlayer
+              ? Center(
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: Colors.amber,
+                      shape: BoxShape.circle,
                     ),
                   ),
-                ),
-            ],
-          ),
+                )
+              : null,
+        ),
+        SizedBox(
+          width: smallWidth,
+          child: cards.isNotEmpty
+              ? SizedBox(
+                  height: smallHeight + (cards.length - 1) * overlap,
+                  child: Stack(
+                    children: [
+                      for (int i = 0; i < cards.length; i++)
+                        Positioned(
+                          top: i * overlap,
+                          child: SizedBox(
+                            width: smallWidth,
+                            height: smallHeight,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                foregroundDecoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(6),
+                                  border:
+                                      Border.all(color: Colors.black, width: 1),
+                                ),
+                                child: cardBack.build(),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                )
+              : null,
         ),
       ],
     );

@@ -149,6 +149,9 @@ class GamePage extends HookConsumerWidget {
                           round: round,
                           onCardTap: handleCardTap,
                           cardBack: cardBack,
+                          showDiscardHint: round.phase ==
+                                  GamePhase.dealerDiscard &&
+                              round.dealer == PlayerPosition.south,
                         )
                       : Center(
                           child: CircularProgressIndicator(
@@ -171,25 +174,6 @@ class GamePage extends HookConsumerWidget {
               coachAdvice: saveState?.coachMode == true
                   ? const CoachAdvisor().advise(round, state.scores)
                   : null,
-            ),
-          if (round != null &&
-              round.phase == GamePhase.dealerDiscard &&
-              round.dealer == PlayerPosition.south)
-            Positioned(
-              bottom: 120,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.black87,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text('Tap a card to discard',
-                      style: TextStyle(color: Colors.white, fontSize: 14)),
-                ),
-              ),
             ),
           if (round != null && round.phase == GamePhase.roundComplete)
             RoundResultBanner(

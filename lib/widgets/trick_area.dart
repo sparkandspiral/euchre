@@ -18,25 +18,33 @@ class TrickArea extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final trick = round.currentTrick;
-    if (trick == null || trick.plays.isEmpty) {
-      // Show turned card during bidding
-      if (round.phase.isBidding) {
-        return _TurnedCardDisplay(
-          round: round,
-          cardWidth: cardWidth,
-          cardHeight: cardHeight,
-        );
-      }
-      return SizedBox.shrink();
-    }
-
     final smallWidth = cardWidth * 0.85;
     final smallHeight = cardHeight * 0.85;
     final offset = smallWidth * 0.55;
+    final areaWidth = smallWidth * 2 + offset;
+    final areaHeight = smallHeight * 2 + offset * 0.6;
+
+    if (trick == null || trick.plays.isEmpty) {
+      // Show turned card during bidding
+      if (round.phase.isBidding) {
+        return SizedBox(
+          width: areaWidth,
+          height: areaHeight,
+          child: Center(
+            child: _TurnedCardDisplay(
+              round: round,
+              cardWidth: cardWidth,
+              cardHeight: cardHeight,
+            ),
+          ),
+        );
+      }
+      return SizedBox(width: areaWidth, height: areaHeight);
+    }
 
     return SizedBox(
-      width: smallWidth * 2 + offset,
-      height: smallHeight * 2 + offset * 0.6,
+      width: areaWidth,
+      height: areaHeight,
       child: Stack(
         clipBehavior: Clip.none,
         children: [

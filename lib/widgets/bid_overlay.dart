@@ -4,18 +4,19 @@ import 'package:euchre/ai/coach_advisor.dart';
 import 'package:euchre/model/euchre_round_state.dart';
 import 'package:euchre/model/game_phase.dart';
 import 'package:euchre/model/player.dart';
-import 'package:euchre/services/game_engine.dart';
 import 'package:euchre/styles/playing_card_builder.dart';
 
 class BidOverlay extends StatelessWidget {
   final EuchreRoundState round;
-  final GameEngine engine;
+  final void Function(bool orderUp, {bool goAlone}) onBidRound1;
+  final void Function(CardSuit? suit) onBidRound2;
   final CoachAdvice? coachAdvice;
 
   const BidOverlay({
     super.key,
     required this.round,
-    required this.engine,
+    required this.onBidRound1,
+    required this.onBidRound2,
     this.coachAdvice,
   });
 
@@ -69,12 +70,12 @@ class BidOverlay extends StatelessWidget {
               child: round.phase == GamePhase.bidRound1
                   ? _Round1Bid(
                       round: round,
-                      engine: engine,
+                      onBidRound1: onBidRound1,
                       coachAdvice: coachAdvice,
                     )
                   : _Round2Bid(
                       round: round,
-                      engine: engine,
+                      onBidRound2: onBidRound2,
                       coachAdvice: coachAdvice,
                     ),
             ),
@@ -87,12 +88,12 @@ class BidOverlay extends StatelessWidget {
 
 class _Round1Bid extends StatelessWidget {
   final EuchreRoundState round;
-  final GameEngine engine;
+  final void Function(bool orderUp, {bool goAlone}) onBidRound1;
   final CoachAdvice? coachAdvice;
 
   const _Round1Bid({
     required this.round,
-    required this.engine,
+    required this.onBidRound1,
     this.coachAdvice,
   });
 
@@ -131,7 +132,7 @@ class _Round1Bid extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             ElevatedButton(
-              onPressed: () => engine.humanBidRound1(true),
+              onPressed: () => onBidRound1(true),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Color(0xFF2E7D32),
                 foregroundColor: Colors.white,
@@ -141,7 +142,7 @@ class _Round1Bid extends StatelessWidget {
             ),
             SizedBox(width: 16),
             OutlinedButton(
-              onPressed: () => engine.humanBidRound1(false),
+              onPressed: () => onBidRound1(false),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.white70,
                 side: BorderSide(color: Colors.white38),
@@ -153,7 +154,7 @@ class _Round1Bid extends StatelessWidget {
         ),
         SizedBox(height: 12),
         TextButton(
-          onPressed: () => engine.humanBidRound1(true, goAlone: true),
+          onPressed: () => onBidRound1(true, goAlone: true),
           child: Text(
             'Order Up & Go Alone',
             style: TextStyle(color: Colors.amber, fontSize: 12),
@@ -167,12 +168,12 @@ class _Round1Bid extends StatelessWidget {
 
 class _Round2Bid extends StatelessWidget {
   final EuchreRoundState round;
-  final GameEngine engine;
+  final void Function(CardSuit? suit) onBidRound2;
   final CoachAdvice? coachAdvice;
 
   const _Round2Bid({
     required this.round,
-    required this.engine,
+    required this.onBidRound2,
     this.coachAdvice,
   });
 
@@ -220,14 +221,14 @@ class _Round2Bid extends StatelessWidget {
             for (final suit in availableSuits)
               _SuitButton(
                 suit: suit,
-                onTap: () => engine.humanBidRound2(suit),
+                onTap: () => onBidRound2(suit),
               ),
           ],
         ),
         if (!isDealer) ...[
           SizedBox(height: 16),
           OutlinedButton(
-            onPressed: () => engine.humanBidRound2(null),
+            onPressed: () => onBidRound2(null),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white70,
               side: BorderSide(color: Colors.white38),

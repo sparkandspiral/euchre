@@ -6,19 +6,18 @@ import 'package:euchre/model/card_back.dart';
 import 'package:euchre/model/euchre_round_state.dart';
 import 'package:euchre/model/game_phase.dart';
 import 'package:euchre/model/player.dart';
-import 'package:euchre/services/game_engine.dart';
 import 'package:euchre/styles/playing_card_builder.dart';
 import 'package:euchre/widgets/trick_area.dart';
 
 class EuchreTable extends StatelessWidget {
   final EuchreRoundState round;
-  final GameEngine engine;
+  final void Function(SuitedCard)? onCardTap;
   final CardBack? cardBack;
 
   const EuchreTable({
     super.key,
     required this.round,
-    required this.engine,
+    this.onCardTap,
     this.cardBack,
   });
 
@@ -115,13 +114,7 @@ class EuchreTable extends StatelessWidget {
                 isActive: isHumanTurn,
                 trumpSuit: round.trumpSuit,
                 ledSuit: _effectiveLedSuit(),
-                onCardTap: (card) {
-                  if (round.phase == GamePhase.dealerDiscard) {
-                    engine.humanDiscard(card);
-                  } else if (round.phase == GamePhase.playing) {
-                    engine.humanPlayCard(card);
-                  }
-                },
+                onCardTap: onCardTap != null ? (card) => onCardTap!(card) : (_) {},
               ),
             ),
             SizedBox(height: spacing * 2),

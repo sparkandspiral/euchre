@@ -16,6 +16,7 @@ import 'package:euchre/services/game_engine.dart';
 import 'package:euchre/widgets/bid_overlay.dart';
 import 'package:euchre/widgets/euchre_table.dart';
 import 'package:euchre/widgets/game_over_overlay.dart';
+import 'package:euchre/widgets/practice_feedback_banner.dart';
 import 'package:euchre/widgets/round_result_banner.dart';
 import 'package:euchre/widgets/score_display.dart';
 import 'package:euchre/widgets/trump_indicator.dart';
@@ -56,6 +57,79 @@ class GamePage extends HookConsumerWidget {
     final round = state.currentRound;
     final background = saveState?.background;
     final cardBack = saveState?.cardBack;
+    final isPractice = saveState?.practiceMode == true;
+
+    // Practice mode feedback state
+    final practiceFeedback =
+        useState<({bool isGood, String message})?>(null);
+    final practiceFeedbackKey = useState(0);
+
+    void showPracticeFeedback(bool isGood, String message) {
+      practiceFeedback.value = (isGood: isGood, message: message);
+      practiceFeedbackKey.value++;
+    }
+
+    void handleCardTap(SuitedCard card) {
+      if (round == null) return;
+      if (isPractice && round.phase == GamePhase.playing) {
+        final advice =
+            const CoachAdvisor().advise(round, state.scores);
+        if (advice?.suggestedCard != null) {
+          final suggested = advice!.suggestedCard!;
+          final isMatch = card.suit == suggested.suit &&
+              card.value.toString() == suggested.value.toString();
+          showPracticeFeedback(
+            isMatch,
+            isMatch
+                ? 'Good play! ${advice.reasoning}'
+                : 'Consider: ${advice.recommendation}. ${advice.reasoning}',
+          );
+        }
+      }
+      if (round.phase == GamePhase.dealerDiscard) {
+        engine.humanDiscard(card);
+      } else if (round.phase == GamePhase.playing) {
+        engine.humanPlayCard(card);
+      }
+    }
+
+    void handleBidRound1(bool orderUp, {bool goAlone = false}) {
+      if (isPractice && round != null) {
+        final advice =
+            const CoachAdvisor().advise(round, state.scores);
+        if (advice != null) {
+          final isMatch = advice.recommendation.toLowerCase().contains(
+                orderUp ? 'order up' : 'pass',
+              );
+          showPracticeFeedback(
+            isMatch,
+            isMatch
+                ? 'Good call! ${advice.reasoning}'
+                : 'Consider: ${advice.recommendation}. ${advice.reasoning}',
+          );
+        }
+      }
+      engine.humanBidRound1(orderUp, goAlone: goAlone);
+    }
+
+    void handleBidRound2(CardSuit? suit) {
+      if (isPractice && round != null) {
+        final advice =
+            const CoachAdvisor().advise(round, state.scores);
+        if (advice != null) {
+          final isMatch = suit == null
+              ? advice.recommendation.toLowerCase().contains('pass')
+              : advice.suggestedSuit == suit;
+          showPracticeFeedback(
+            isMatch,
+            isMatch
+                ? 'Good call! ${advice.reasoning}'
+                : 'Consider: ${advice.recommendation}. ${advice.reasoning}',
+          );
+        }
+      }
+      engine.humanBidRound2(suit);
+    }
 
     return Scaffold(
       body: Stack(
@@ -73,7 +147,7 @@ class GamePage extends HookConsumerWidget {
                   child: round != null
                       ? EuchreTable(
                           round: round,
-                          engine: engine,
+                          onCardTap: handleCardTap,
                           cardBack: cardBack,
                         )
                       : Center(
@@ -92,7 +166,8 @@ class GamePage extends HookConsumerWidget {
           if (round != null && round.phase.isBidding)
             BidOverlay(
               round: round,
-              engine: engine,
+              onBidRound1: handleBidRound1,
+              onBidRound2: handleBidRound2,
               coachAdvice: saveState?.coachMode == true
                   ? const CoachAdvisor().advise(round, state.scores)
                   : null,
@@ -126,6 +201,13 @@ class GamePage extends HookConsumerWidget {
               state: state,
               onPlayAgain: () => engine.startGame(),
               onExit: () => Navigator.of(context).pop(),
+            ),
+          if (practiceFeedback.value != null)
+            PracticeFeedbackBanner(
+              key: ValueKey(practiceFeedbackKey.value),
+              isGoodPlay: practiceFeedback.value!.isGood,
+              message: practiceFeedback.value!.message,
+              onDismissed: () => practiceFeedback.value = null,
             ),
           Align(
             alignment: Alignment.topCenter,

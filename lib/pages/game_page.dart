@@ -8,6 +8,7 @@ import 'package:euchre/model/game_phase.dart';
 import 'package:card_game/card_game.dart';
 import 'package:euchre/ai/coach_advisor.dart';
 import 'package:euchre/logic/card_ranking.dart';
+import 'package:euchre/utils/card_description.dart';
 import 'package:euchre/model/euchre_round_state.dart';
 import 'package:euchre/model/player.dart';
 import 'package:euchre/model/save_state.dart';
@@ -19,7 +20,9 @@ import 'package:euchre/widgets/euchre_table.dart';
 import 'package:euchre/widgets/game_over_overlay.dart';
 import 'package:euchre/widgets/practice_feedback_banner.dart';
 import 'package:euchre/widgets/round_result_banner.dart';
+import 'package:euchre/widgets/game_event_banner.dart';
 import 'package:euchre/widgets/score_display.dart';
+import 'package:euchre/widgets/trick_history_sheet.dart';
 import 'package:euchre/widgets/trump_indicator.dart';
 
 class GamePage extends HookConsumerWidget {
@@ -38,6 +41,10 @@ class GamePage extends HookConsumerWidget {
     final audioService = ref.read(audioServiceProvider);
     final notifier = ref.read(saveStateNotifierProvider.notifier);
 
+    // Game event announcement state
+    final gameEvent = useState<String?>(null);
+    final gameEventKey = useState(0);
+
     final engine = useMemoized(() => GameEngine(
           difficulty: difficulty,
           onStateChanged: (state) {
@@ -54,6 +61,10 @@ class GamePage extends HookConsumerWidget {
             audioService.playWin();
             confetti.play();
             notifier.recordGameResult(won: true);
+          },
+          onGameEvent: (message) {
+            gameEvent.value = message;
+            gameEventKey.value++;
           },
         ));
 
@@ -162,9 +173,7 @@ class GamePage extends HookConsumerWidget {
                           round: round,
                           onCardTap: handleCardTap,
                           cardBack: cardBack,
-                          showDiscardHint: round.phase ==
-                                  GamePhase.dealerDiscard &&
-                              round.dealer == PlayerPosition.south,
+                          discardMessage: _discardMessage(round),
                         )
                       : Center(
                           child: CircularProgressIndicator(
@@ -174,7 +183,7 @@ class GamePage extends HookConsumerWidget {
                   _CoachBanner(round: round, scores: state.scores),
                 _BottomBar(
                   state: state,
-                  onMenu: () => _showMenu(context, engine, ref),
+                  onMenu: () => _showMenu(context, engine, ref, state),
                 ),
               ],
             ),
@@ -198,6 +207,19 @@ class GamePage extends HookConsumerWidget {
               state: state,
               onPlayAgain: () => engine.startGame(),
               onExit: () => Navigator.of(context).pop(),
+            ),
+          // Game event announcements
+          if (gameEvent.value != null)
+            Positioned(
+              top: 80,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: GameEventBanner(
+                  message: gameEvent.value!,
+                  eventKey: gameEventKey.value,
+                ),
+              ),
             ),
           if (practiceFeedback.value != null)
             PracticeFeedbackBanner(
@@ -224,7 +246,22 @@ class GamePage extends HookConsumerWidget {
     );
   }
 
-  void _showMenu(BuildContext context, GameEngine engine, WidgetRef ref) {
+  String? _discardMessage(EuchreRoundState round) {
+    if (round.phase != GamePhase.dealerDiscard) return null;
+    if (round.dealer != PlayerPosition.south) return null;
+    final caller = round.caller;
+    final suit = round.trumpSuit;
+    if (caller == null || suit == null) return null;
+    final suitName = describeSuitName(suit);
+    final callerName = caller.displayName;
+    if (caller == PlayerPosition.south) {
+      return 'You ordered up $suitName. Tap a card to discard.';
+    }
+    return '$callerName ordered up $suitName. Tap a card to discard.';
+  }
+
+  void _showMenu(BuildContext context, GameEngine engine, WidgetRef ref,
+      EuchreGameState gameState) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Color(0xFF0A2340),
@@ -273,6 +310,17 @@ class GamePage extends HookConsumerWidget {
                           )),
                 ),
                 Divider(color: Colors.white12),
+                if (gameState.currentRound != null &&
+                    gameState.currentRound!.completedTricks.isNotEmpty)
+                  ListTile(
+                    leading: Icon(Icons.history, color: Colors.white70),
+                    title: Text('Trick History',
+                        style: TextStyle(color: Colors.white)),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showTrickHistory(context, gameState.currentRound!);
+                    },
+                  ),
                 ListTile(
                   leading: Icon(Icons.refresh, color: Colors.white70),
                   title:
@@ -295,6 +343,27 @@ class GamePage extends HookConsumerWidget {
             ),
           );
         },
+      ),
+    );
+  }
+
+  void _showTrickHistory(BuildContext context, EuchreRoundState round) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Color(0xFF0A2340),
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.85,
+        builder: (_, controller) => SingleChildScrollView(
+          controller: controller,
+          child: TrickHistorySheet(round: round),
+        ),
       ),
     );
   }

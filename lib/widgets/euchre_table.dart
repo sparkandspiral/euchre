@@ -13,14 +13,14 @@ class EuchreTable extends StatelessWidget {
   final EuchreRoundState round;
   final void Function(SuitedCard)? onCardTap;
   final CardBack? cardBack;
-  final bool showDiscardHint;
+  final String? discardMessage;
 
   const EuchreTable({
     super.key,
     required this.round,
     this.onCardTap,
     this.cardBack,
-    this.showDiscardHint = false,
+    this.discardMessage,
   });
 
   @override
@@ -109,7 +109,7 @@ class EuchreTable extends StatelessWidget {
             SizedBox(height: spacing),
 
             // Discard hint
-            if (showDiscardHint)
+            if (discardMessage != null)
               Padding(
                 padding: EdgeInsets.only(bottom: 4),
                 child: Container(
@@ -118,7 +118,8 @@ class EuchreTable extends StatelessWidget {
                     color: Colors.black87,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text('Tap a card to discard',
+                  child: Text(discardMessage!,
+                      textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white, fontSize: 13)),
                 ),
               ),

@@ -24,6 +24,7 @@ class GameEngine {
   EuchreGameState _state;
   bool _disposed = false;
   Timer? _pendingTimer;
+  double speedMultiplier = 1.0;
 
   GameEngine({
     required this.difficulty,
@@ -548,7 +549,9 @@ class GameEngine {
 
   void _scheduleAction(void Function() action, {Duration? delay}) {
     _pendingTimer?.cancel();
-    final actualDelay = delay ?? difficulty.thinkDelay;
+    final baseDelay = delay ?? difficulty.thinkDelay;
+    final scaledMs = (baseDelay.inMilliseconds / speedMultiplier).round();
+    final actualDelay = Duration(milliseconds: scaledMs.clamp(50, 10000));
     _pendingTimer = Timer(actualDelay, () {
       if (!_disposed) action();
     });

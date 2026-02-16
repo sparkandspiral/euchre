@@ -68,6 +68,9 @@ class GamePage extends HookConsumerWidget {
           },
         ));
 
+    // Keep engine speed in sync with settings
+    engine.speedMultiplier = saveState?.playSpeed ?? 1.0;
+
     useEffect(() {
       if (resumeState != null) {
         engine.resumeGame(resumeState!);
@@ -309,6 +312,35 @@ class GamePage extends HookConsumerWidget {
                             coachMode: v ? false : s.coachMode,
                           )),
                 ),
+                ListTile(
+                  leading:
+                      Icon(Icons.speed, color: Colors.orange.shade200),
+                  title: Text('Play Speed',
+                      style: TextStyle(color: Colors.white)),
+                  trailing: DropdownButton<double>(
+                    value: saveState.playSpeed,
+                    dropdownColor: Color(0xFF0A2340),
+                    underline: SizedBox.shrink(),
+                    style: TextStyle(color: Colors.white, fontSize: 14),
+                    items: [0.5, 1.0, 2.0, 4.0].map((speed) {
+                      final label = speed % 1 == 0
+                          ? '${speed.toInt()}x'
+                          : '${speed}x';
+                      return DropdownMenuItem(
+                        value: speed,
+                        child: Text(label),
+                      );
+                    }).toList(),
+                    onChanged: (v) {
+                      if (v != null) {
+                        ref
+                            .read(saveStateNotifierProvider.notifier)
+                            .updateState(
+                                (s) => s.copyWith(playSpeed: v));
+                      }
+                    },
+                  ),
+                ),
                 Divider(color: Colors.white12),
                 if (gameState.currentRound != null &&
                     gameState.currentRound!.completedTricks.isNotEmpty)
@@ -471,6 +503,15 @@ class _StatusRow extends StatelessWidget {
           color: _suitColor(ledSuit),
         ));
       }
+    }
+
+    // Show caller/defender indicator when trump is set
+    if (round.trumpSuit != null && round.caller != null) {
+      final isOurCall = round.caller!.team == Team.playerTeam;
+      items.add(_StatusChip(
+        label: isOurCall ? 'Us: Callers' : 'Us: Defenders',
+        color: isOurCall ? Colors.amber : Colors.blue.shade200,
+      ));
     }
 
     // Show last trick winner

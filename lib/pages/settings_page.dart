@@ -192,6 +192,52 @@ class SettingsPage extends ConsumerWidget {
               ),
             ],
           ),
+          SizedBox(height: 16),
+
+          // Play Speed
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Play Speed',
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600)),
+                    SizedBox(height: 4),
+                    Text(
+                      'Controls how fast CPU players act',
+                      style: TextStyle(color: Colors.white38, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              DropdownButton<double>(
+                value: saveState.playSpeed,
+                dropdownColor: Color(0xFF0A2340),
+                underline: SizedBox.shrink(),
+                style: TextStyle(color: Colors.white, fontSize: 14),
+                items: [0.5, 1.0, 2.0, 4.0].map((speed) {
+                  final label = speed % 1 == 0
+                      ? '${speed.toInt()}x'
+                      : '${speed}x';
+                  return DropdownMenuItem(
+                    value: speed,
+                    child: Text(label),
+                  );
+                }).toList(),
+                onChanged: (v) {
+                  if (v != null) {
+                    ref
+                        .read(saveStateNotifierProvider.notifier)
+                        .updateState((s) => s.copyWith(playSpeed: v));
+                  }
+                },
+              ),
+            ],
+          ),
           SizedBox(height: 32),
 
           // Stats

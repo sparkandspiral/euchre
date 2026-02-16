@@ -11,6 +11,7 @@ class EuchreSaveState {
   final int gamesPlayed;
   final bool coachMode;
   final bool practiceMode;
+  final double playSpeed;
   final Set<String> completedLessons;
 
   const EuchreSaveState({
@@ -22,6 +23,7 @@ class EuchreSaveState {
     this.gamesPlayed = 0,
     this.coachMode = false,
     this.practiceMode = false,
+    this.playSpeed = 1.0,
     this.completedLessons = const {},
   });
 
@@ -34,6 +36,7 @@ class EuchreSaveState {
     int? gamesPlayed,
     bool? coachMode,
     bool? practiceMode,
+    double? playSpeed,
     Set<String>? completedLessons,
   }) {
     return EuchreSaveState(
@@ -45,6 +48,7 @@ class EuchreSaveState {
       gamesPlayed: gamesPlayed ?? this.gamesPlayed,
       coachMode: coachMode ?? this.coachMode,
       practiceMode: practiceMode ?? this.practiceMode,
+      playSpeed: playSpeed ?? this.playSpeed,
       completedLessons: completedLessons ?? this.completedLessons,
     );
   }
@@ -58,6 +62,7 @@ class EuchreSaveState {
         'gamesPlayed': gamesPlayed,
         'coachMode': coachMode,
         'practiceMode': practiceMode,
+        'playSpeed': playSpeed,
         'completedLessons': completedLessons.toList(),
       };
 
@@ -71,6 +76,7 @@ class EuchreSaveState {
       gamesPlayed: json['gamesPlayed'] as int? ?? 0,
       coachMode: json['coachMode'] as bool? ?? false,
       practiceMode: json['practiceMode'] as bool? ?? false,
+      playSpeed: (json['playSpeed'] as num?)?.toDouble() ?? 1.0,
       completedLessons: (json['completedLessons'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toSet() ??

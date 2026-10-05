@@ -267,6 +267,37 @@ class SettingsPage extends ConsumerWidget {
               ],
             ),
           ),
+          SizedBox(height: 32),
+
+          // Licenses
+          InkWell(
+            onTap: () => showLicensePage(
+              context: context,
+              applicationName: 'Euchre',
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Licenses',
+                          style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600)),
+                      SizedBox(height: 4),
+                      Text(
+                        'Open-source and font licenses used in this app',
+                        style: TextStyle(color: Colors.white38, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: Colors.white54),
+              ],
+            ),
+          ),
         ],
       ),
     );
